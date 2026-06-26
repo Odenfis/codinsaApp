@@ -1,0 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-background: #f8f9fa;
+  --color-surface: #f8f9fa;
+  --color-surface-dim: #d9dadb;
+  --color-surface-bright: #f8f9fa;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f3f4f5;
+  --color-surface-container: #edeeef;
+  --color-surface-container-high: #e7e8e9;
+  --color-surface-container-highest: #e1e3e4;
+  --color-on-surface: #191c1d;
+  --color-on-surface-variant: #3e4948;
+  --color-outline: #6f7979;
+  --color-outline-variant: #bec9c8;
+  --color-primary: #006767;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #2e8080;
+  --color-on-primary-container: #f3fffe;
+  --color-primary-fixed: #a2f0f0;
+  --color-on-primary-fixed: #002020;
+  --color-on-primary-fixed-variant: #004f50;
+  --color-secondary: #566500;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #d1ec46;
+  --color-on-secondary-container: #5a6900;
+  --color-tertiary: #43606d;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #5c7987;
+  --color-on-tertiary-container: #fbfdff;
+  --color-tertiary-fixed: #c9e7f7;
+  --color-on-tertiary-fixed: #001f2a;
+  --color-on-tertiary-fixed-variant: #2e4b57;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-headline: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-on-surface);
+  font-family: var(--font-sans);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+

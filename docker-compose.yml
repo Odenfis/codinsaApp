@@ -1,0 +1,38 @@
+# =============================================================================
+# docker-compose.yml - Tool Kit Enterprise Platform
+# Despliegue en servidor Windows cliente con SQL Server 2022 nativo
+# =============================================================================
+# Uso:
+#   docker compose up -d          → Iniciar en background
+#   docker compose logs -f        → Ver logs
+#   docker compose down           → Detener
+#   docker compose build --no-cache && docker compose up -d  → Reconstruir
+# =============================================================================
+
+version: '3.8'
+
+services:
+  toolkit-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: toolkit-enterprise:latest
+    container_name: toolkit-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # Credenciales SQL Server del cliente (Windows nativo)
+      # host.docker.internal resuelve al host en Docker Desktop for Windows
+      - DB_SERVER=host.docker.internal,1433
+      - DB_USER=Coinsa
+      - DB_PASSWORD=2026
+      - DB_NAME=COINSA
+      - SESSION_SECRET=${SESSION_SECRET:-ToolKit_SecureKey_2026_Enterprise}
+    networks:
+      - toolkit-network
+
+networks:
+  toolkit-network:
+    driver: bridge
