@@ -44,6 +44,7 @@ export interface Modulo {
     eliminacion: boolean;
     exportar: boolean;
   };
+  children?: Modulo[];
 }
 
 export interface Auditoria {
@@ -137,4 +138,55 @@ export interface PaginatedResponse<T> {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+export interface UbigeoSunat {
+  cod_dpto: string;
+  nom_dpto: string;
+  cod_prov: string;
+  nom_prov: string;
+  cod_dist: string;
+  nom_dist: string;
+  ubigeo_6d: string;
+}
+
+export interface ClienteUbigeo {
+  CODIGO: number;
+  ruc_dni: string;
+  dpto: string;
+  provincia: string;
+  distrito: string;
+  UBIGEO: string;
+  NUBIGEO: string;
+}
+
+export interface ClienteSimple {
+  Codclie: number;
+  Razon: string;
+  Documento: string;
+}
+
+export interface Producto {
+  CodPro: string;
+  CodBar: string | null;
+  Nombre: string;
+  Clinea: number;
+  Stock: number;
+  Costo: number;
+  PventaMa: number;
+  PventaMi: number;
+  Eliminado: boolean;
+  CodLab: string | null;
+  linea_descripcion?: string;
+  lab_descripcion?: string;
+}
+
+export interface Linea {
+  CodLinea: number;
+  Descripcion: string | null;
+}
+
+export interface Laboratorio {
+  CodLab: string;
+  Descripcion: string;
 }

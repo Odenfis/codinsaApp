@@ -15,18 +15,23 @@ class EnterpriseDatabase {
 
   public modulos: Modulo[] = [
     { id_modulo: 1, nombre_modulo: 'Dashboard', icono: 'LayoutDashboard', ruta: '/dashboard', orden: 1, estado: true },
-    { id_modulo: 2, nombre_modulo: 'Clients', icono: 'Users', ruta: '/clients', orden: 2, estado: true },
-    { id_modulo: 3, nombre_modulo: 'Providers', icono: 'Network', ruta: '/providers', orden: 3, estado: true },
-    { id_modulo: 4, nombre_modulo: 'Users', icono: 'UserCheck', ruta: '/users', orden: 4, estado: true },
-    { id_modulo: 5, nombre_modulo: 'Reports', icono: 'BarChart3', ruta: '/reports', orden: 5, estado: true },
-    { id_modulo: 6, nombre_modulo: 'Settings', icono: 'Settings', ruta: '/settings', orden: 6, estado: true },
-    { id_modulo: 7, nombre_modulo: 'Audit', icono: 'ShieldCheck', ruta: '/audit', orden: 7, estado: true }
+    { id_modulo: 2, nombre_modulo: 'Clientes', icono: 'Users', ruta: '/clients', orden: 2, estado: true, children: [
+      { id_modulo: 8, nombre_modulo: 'Gestión Ubigeos', icono: 'MapPin', ruta: '/clients/ubigeo', orden: 1, estado: true }
+    ] },
+    { id_modulo: 9, nombre_modulo: 'Productos', icono: 'Package', ruta: '/products', orden: 3, estado: true, children: [
+      { id_modulo: 10, nombre_modulo: 'Listado de Productos', icono: 'List', ruta: '/products', orden: 1, estado: true }
+    ] },
+    { id_modulo: 3, nombre_modulo: 'Providers', icono: 'Network', ruta: '/providers', orden: 4, estado: false },
+    { id_modulo: 4, nombre_modulo: 'Users', icono: 'UserCheck', ruta: '/users', orden: 5, estado: false },
+    { id_modulo: 5, nombre_modulo: 'Reports', icono: 'BarChart3', ruta: '/reports', orden: 6, estado: false },
+    { id_modulo: 6, nombre_modulo: 'Settings', icono: 'Settings', ruta: '/settings', orden: 7, estado: false },
+    { id_modulo: 7, nombre_modulo: 'Audit', icono: 'ShieldCheck', ruta: '/audit', orden: 8, estado: false }
   ];
 
   public rolesModulos: Record<number, number[]> = {
-    1: [1, 2, 3, 4, 5, 6, 7], // Enterprise Admin: todo
-    2: [1, 2, 3, 5, 7],       // Auditor: todo menos users y settings (sólo lectura)
-    3: [1, 2, 3, 5]           // Gestor operativo
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], // Enterprise Admin: todo
+    2: [1, 2, 3, 5, 7],                  // Auditor: todo menos users, settings, productos (sólo lectura)
+    3: [1, 2, 3, 5, 9, 10]               // Gestor operativo: incluye productos
   };
 
   public usuarios: Usuario[] = [

@@ -17,6 +17,21 @@ USE [ToolKitEnterpriseDB];
 GO
 
 -- ==============================================================================
+-- 0. TABLA DE UBIGEOS SUNAT PERÚ (CATÁLOGO OFICIAL)
+-- ==============================================================================
+
+IF OBJECT_ID('dbo.Ubigeos_SUNAT', 'U') IS NOT NULL DROP TABLE dbo.Ubigeos_SUNAT;
+CREATE TABLE dbo.Ubigeos_SUNAT (
+    cod_dpto  CHAR(2)     NOT NULL,
+    nom_dpto  VARCHAR(60) NOT NULL,
+    cod_prov  CHAR(2)     NOT NULL,
+    nom_prov  VARCHAR(60) NOT NULL,
+    cod_dist  CHAR(2)     NOT NULL,
+    nom_dist  VARCHAR(60) NOT NULL,
+    ubigeo_6d CHAR(6)     NOT NULL PRIMARY KEY
+);
+
+-- ==============================================================================
 -- 1. TABLAS DEL NÚCLEO DE SEGURIDAD Y MENÚ DINÁMICO
 -- ==============================================================================
 

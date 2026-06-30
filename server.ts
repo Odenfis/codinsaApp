@@ -194,6 +194,64 @@ app.delete('/api/providers/:id', authMiddleware, (req: AuthenticatedRequest, res
   return res.json({ success: true });
 });
 
+// ==============================================================================
+// 3c. ENDPOINTS DE PRODUCTOS (Listado con filtros desde SQL Server real)
+// ==============================================================================
+
+app.get('/api/productos', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const search = (req.query.search as string) || '';
+    const linea = (req.query.linea as string) || '';
+    const lab = (req.query.lab as string) || '';
+
+    let query = `SELECT p.CodPro, p.CodBar, p.Nombre, p.Clinea, p.Stock, p.Costo, p.PventaMa, p.PventaMi, p.Eliminado, p.CodLab, l.Descripcion AS linea_descripcion, lab.Descripcion AS lab_descripcion FROM Productos p LEFT JOIN Lineas l ON p.Clinea = l.CodLinea LEFT JOIN Laboratorios lab ON LEFT(p.CodPro, 2) = LEFT(lab.CodLab, 2) WHERE p.Eliminado = 0`;
+    const request = pool.request();
+
+    if (search) {
+      query += ` AND p.Nombre LIKE @search`;
+      request.input('search', sql.NVarChar, `%${search}%`);
+    }
+    if (linea) {
+      query += ` AND p.Clinea = @linea`;
+      request.input('linea', sql.Int, parseInt(linea));
+    }
+    if (lab) {
+      query += ` AND LEFT(p.CodPro, 2) = LEFT(@lab, 2)`;
+      request.input('lab', sql.Char(4), lab);
+    }
+
+    query += ` ORDER BY p.Nombre`;
+    const result = await request.query(query);
+    return res.json({ data: result.recordset, total: result.recordset.length });
+  } catch (err: any) {
+    console.error('[PRODUCTOS ERROR]', err);
+    return res.status(500).json({ error: 'Error al obtener productos.' });
+  }
+});
+
+app.get('/api/productos/lineas', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request().query(`SELECT CodLinea, Descripcion FROM Lineas ORDER BY Descripcion`);
+    return res.json({ data: result.recordset });
+  } catch (err: any) {
+    console.error('[PRODUCTOS ERROR]', err);
+    return res.status(500).json({ error: 'Error al obtener líneas.' });
+  }
+});
+
+app.get('/api/productos/laboratorios', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request().query(`SELECT CodLab, Descripcion FROM Laboratorios ORDER BY Descripcion`);
+    return res.json({ data: result.recordset });
+  } catch (err: any) {
+    console.error('[PRODUCTOS ERROR]', err);
+    return res.status(500).json({ error: 'Error al obtener laboratorios.' });
+  }
+});
+
 // USUARIOS
 app.get('/api/users', authMiddleware, async (req: Request, res: Response) => {
   try {
@@ -253,6 +311,121 @@ app.get('/api/audit', authMiddleware, (req: Request, res: Response) => {
 // CONFIGURACIÓN / ROLES
 app.get('/api/settings', authMiddleware, (req: Request, res: Response) => {
   return res.json({ roles: db.roles, modulos: db.modulos });
+});
+
+// ==============================================================================
+// 3b. ENDPOINTS DE UBIGEO (Catálogo SUNAT + Asignación a Clientes)
+// ==============================================================================
+
+app.get('/api/ubigeo/departamentos', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request()
+      .query(`SELECT DISTINCT cod_dpto, nom_dpto FROM Ubigeos_SUNAT ORDER BY nom_dpto`);
+    return res.json({ data: result.recordset });
+  } catch (err: any) {
+    console.error('[UBIGEO ERROR]', err);
+    return res.status(500).json({ error: 'Error al obtener departamentos.' });
+  }
+});
+
+app.get('/api/ubigeo/provincias/:dpto', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request()
+      .input('dpto', sql.Char(2), req.params.dpto)
+      .query(`SELECT DISTINCT cod_prov, nom_prov FROM Ubigeos_SUNAT WHERE cod_dpto = @dpto ORDER BY nom_prov`);
+    return res.json({ data: result.recordset });
+  } catch (err: any) {
+    console.error('[UBIGEO ERROR]', err);
+    return res.status(500).json({ error: 'Error al obtener provincias.' });
+  }
+});
+
+app.get('/api/ubigeo/distritos/:dpto/:prov', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request()
+      .input('dpto', sql.Char(2), req.params.dpto)
+      .input('prov', sql.Char(2), req.params.prov)
+      .query(`SELECT cod_dist, nom_dist, ubigeo_6d FROM Ubigeos_SUNAT WHERE cod_dpto = @dpto AND cod_prov = @prov ORDER BY nom_dist`);
+    return res.json({ data: result.recordset });
+  } catch (err: any) {
+    console.error('[UBIGEO ERROR]', err);
+    return res.status(500).json({ error: 'Error al obtener distritos.' });
+  }
+});
+
+app.get('/api/ubigeo/clientes', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const search = (req.query.search as string) || '';
+    let query = `SELECT Codclie, Razon, Documento FROM Clientes`;
+    if (search) {
+      query = `SELECT Codclie, Razon, Documento FROM Clientes WHERE Razon LIKE @search OR Documento LIKE @search`;
+    }
+    query += ` ORDER BY Razon`;
+    const request = pool.request();
+    if (search) {
+      request.input('search', sql.NVarChar, `%${search}%`);
+    }
+    const result = await request.query(query);
+    return res.json({ data: result.recordset });
+  } catch (err: any) {
+    console.error('[UBIGEO ERROR]', err);
+    return res.status(500).json({ error: 'Error al obtener clientes.' });
+  }
+});
+
+app.get('/api/ubigeo/cliente/:codclie', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request()
+      .input('codclie', sql.Int, parseInt(req.params.codclie))
+      .query(`SELECT * FROM t_Clientes_ubigeo WHERE CODIGO = @codclie`);
+    return res.json({ data: result.recordset[0] || null });
+  } catch (err: any) {
+    console.error('[UBIGEO ERROR]', err);
+    return res.status(500).json({ error: 'Error al obtener ubigeo del cliente.' });
+  }
+});
+
+app.put('/api/ubigeo/cliente/:codclie', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const codclie = parseInt(req.params.codclie);
+    const { ruc_dni, dpto, provincia, distrito, ubigeo } = req.body;
+    const pool = await getDbPool();
+
+    const exists = await pool.request()
+      .input('codclie', sql.Int, codclie)
+      .query(`SELECT COUNT(*) AS cnt FROM t_Clientes_ubigeo WHERE CODIGO = @codclie`);
+
+    if (exists.recordset[0].cnt > 0) {
+      await pool.request()
+        .input('codclie', sql.Int, codclie)
+        .input('ruc_dni', sql.Char(12), ruc_dni || '')
+        .input('dpto', sql.Int, parseInt(dpto) || 0)
+        .input('provincia', sql.Int, parseInt(provincia) || 0)
+        .input('distrito', sql.Int, parseInt(distrito) || 0)
+        .input('ubigeo', sql.Char(6), ubigeo || '')
+        .query(`UPDATE t_Clientes_ubigeo SET ruc_dni = @ruc_dni, dpto = @dpto, provincia = @provincia, distrito = @distrito, UBIGEO = @ubigeo, NUBIGEO = @ubigeo WHERE CODIGO = @codclie`);
+    } else {
+      await pool.request()
+        .input('codclie', sql.Int, codclie)
+        .input('ruc_dni', sql.Char(12), ruc_dni || '')
+        .input('dpto', sql.Int, parseInt(dpto) || 0)
+        .input('provincia', sql.Int, parseInt(provincia) || 0)
+        .input('distrito', sql.Int, parseInt(distrito) || 0)
+        .input('ubigeo', sql.Char(6), ubigeo || '')
+        .query(`INSERT INTO t_Clientes_ubigeo (CODIGO, ruc_dni, dpto, provincia, distrito, UBIGEO, NUBIGEO) VALUES (@codclie, @ruc_dni, @dpto, @provincia, @distrito, @ubigeo, @ubigeo)`);
+    }
+
+    db.addAuditLog(req.user?.nombres + ' ' + req.user?.apellidos, 'Ubigeo', `Actualizó ubigeo del cliente CODIGO ${codclie}`, req.ip);
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error('[UBIGEO ERROR]', err);
+    return res.status(500).json({ error: 'Error al guardar ubigeo del cliente.' });
+  }
 });
 
 // CONSULTAS SQL EXPORTABLES

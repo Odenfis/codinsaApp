@@ -16,6 +16,8 @@ import { UsersView } from './components/modules/UsersView';
 import { ReportsView } from './components/modules/ReportsView';
 import { SettingsView } from './components/modules/SettingsView';
 import { AuditView } from './components/modules/AuditView';
+import { GestionUbigeoView } from './components/modules/GestionUbigeoView';
+import { ProductsView } from './components/modules/ProductsView';
 import { SqlModal } from './components/sql/SqlModal';
 
 const MainLayout: React.FC = () => {
@@ -48,6 +50,8 @@ const MainLayout: React.FC = () => {
       case '/reports': return <ReportsView />;
       case '/settings': return <SettingsView />;
       case '/audit': return <AuditView />;
+      case '/clients/ubigeo': return <GestionUbigeoView />;
+      case '/products': return <ProductsView />;
       default: return <DashboardView onNavigateToModule={setActiveRoute} />;
     }
   };
