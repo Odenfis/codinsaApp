@@ -15,6 +15,7 @@ import {
   MapPin,
   Package,
   List,
+  PenLine,
   ChevronDown
 } from 'lucide-react';
 
@@ -48,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModu
       case 'MapPin': return <MapPin className={className} />;
       case 'Package': return <Package className={className} />;
       case 'List': return <List className={className} />;
+      case 'PenLine': return <PenLine className={className} />;
       default: return <FolderTree className={className} />;
     }
   };

@@ -155,5 +155,24 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
     4. Aplicación actualizada corriendo en `http://localhost:3000`.
 - **Requisitos del cliente:** Docker Desktop, SQL Server 2022 con TCP/IP habilitado, Git.
 
+## 10. Módulo de Edición de Código de Laboratorio (CodLab)
+- **Objetivo:** Permitir la edición masiva e inline del campo `CodLab` (VARCHAR 50) de `[dbo].[Productos]`, un código textual proveniente de documentos físicos, independiente de la tabla `Laboratorios`.
+- **Sidebar:**
+  - Nuevo submenú **"Editar Cod. Laboratorio"** (`icono: PenLine`) bajo Productos, con ruta `/products/edit-lab`.
+  - Icono `PenLine` registrado en el resolver dinámico del `Sidebar.tsx`.
+  - Módulo `id_modulo: 11` agregado a `rolesModulos` para Enterprise Admin y Gestor Operativo.
+- **Nuevo Endpoint Backend:**
+  - `PUT /api/productos/:codpro/codlab` — Actualiza `CodLab` del producto en SQL Server y registra auditoría en `db.addAuditLog`.
+- **Nuevo Componente Frontend (`ProductsEditCodLabView.tsx`):**
+  - Tabla paginada con columnas: Código, Nombre, Línea, Stock, Costo, P. Venta, Laboratorio (descripción referencial) y **CodLab como input de texto editable**.
+  - **Auto-save en blur:** Al salir del campo (Tab o click fuera), guarda automáticamente vía PUT.
+  - **Enter → guarda y avanza:** Al presionar Enter, guarda el valor y enfoca el input de la fila siguiente — flujo continuo sin mouse.
+  - **Optimistic update:** El valor se actualiza en la UI inmediatamente al escribir.
+  - **Feedback visual:** Spinner durante el guardado, checkmark verde (✓) por 1.5s al confirmar.
+  - **Protección contra doble guardado:** `saveInProgress` ref evita llamadas concurrentes al API para el mismo producto.
+  - Mismos filtros (búsqueda por nombre, línea, laboratorio), paginación y exportación Excel/PDF que la vista de listado.
+- **Corrección:** La columna "Laboratorio" usa directamente `lab_descripcion` del JOIN de la API (independiente de `CodLab`), eliminando la función `getLabDesc` que incorrectamente buscaba laboratorios usando `CodLab` como clave.
+- **Ruta registrada en `App.tsx`:** `case '/products/edit-lab'` → `ProductsEditCodLabView`.
+
 ---
-*Última actualización: 29 de Junio, 2026*
+*Última actualización: 03 de Julio, 2026*

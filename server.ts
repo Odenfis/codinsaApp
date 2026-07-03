@@ -252,6 +252,31 @@ app.get('/api/productos/laboratorios', authMiddleware, async (req: Request, res:
   }
 });
 
+app.put('/api/productos/:codpro/codlab', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { codpro } = req.params;
+    const { codlab } = req.body;
+
+    const pool = await getDbPool();
+    await pool.request()
+      .input('codpro', sql.Char(10), codpro)
+      .input('codlab', sql.VarChar(50), codlab || null)
+      .query(`UPDATE Productos SET CodLab = @codlab WHERE CodPro = @codpro`);
+
+    db.addAuditLog(
+      req.user?.nombres + ' ' + req.user?.apellidos,
+      'Productos',
+      `Actualizó CodLab del producto ${codpro} → ${codlab || '(ninguno)'}`,
+      req.ip
+    );
+
+    return res.json({ success: true, CodLab: codlab });
+  } catch (err: any) {
+    console.error('[PRODUCTOS PUT ERROR]', err);
+    return res.status(500).json({ error: 'Error al actualizar código de laboratorio.' });
+  }
+});
+
 // USUARIOS
 app.get('/api/users', authMiddleware, async (req: Request, res: Response) => {
   try {

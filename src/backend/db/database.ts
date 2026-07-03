@@ -19,7 +19,8 @@ class EnterpriseDatabase {
       { id_modulo: 8, nombre_modulo: 'Gestión Ubigeos', icono: 'MapPin', ruta: '/clients/ubigeo', orden: 1, estado: true }
     ] },
     { id_modulo: 9, nombre_modulo: 'Productos', icono: 'Package', ruta: '/products', orden: 3, estado: true, children: [
-      { id_modulo: 10, nombre_modulo: 'Listado de Productos', icono: 'List', ruta: '/products', orden: 1, estado: true }
+      { id_modulo: 10, nombre_modulo: 'Listado de Productos', icono: 'List', ruta: '/products', orden: 1, estado: true },
+      { id_modulo: 11, nombre_modulo: 'Editar Cod. Laboratorio', icono: 'PenLine', ruta: '/products/edit-lab', orden: 2, estado: true }
     ] },
     { id_modulo: 3, nombre_modulo: 'Providers', icono: 'Network', ruta: '/providers', orden: 4, estado: false },
     { id_modulo: 4, nombre_modulo: 'Users', icono: 'UserCheck', ruta: '/users', orden: 5, estado: false },
@@ -29,9 +30,9 @@ class EnterpriseDatabase {
   ];
 
   public rolesModulos: Record<number, number[]> = {
-    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], // Enterprise Admin: todo
-    2: [1, 2, 3, 5, 7],                  // Auditor: todo menos users, settings, productos (sólo lectura)
-    3: [1, 2, 3, 5, 9, 10]               // Gestor operativo: incluye productos
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], // Enterprise Admin: todo
+    2: [1, 2, 3, 5, 7],                      // Auditor: todo menos users, settings, productos (sólo lectura)
+    3: [1, 2, 3, 5, 9, 10, 11]               // Gestor operativo: incluye productos
   };
 
   public usuarios: Usuario[] = [
