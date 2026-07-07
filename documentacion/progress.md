@@ -126,15 +126,15 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
     - `Linea` — Para el filtro de líneas.
     - `Laboratorio` — Para el filtro de laboratorios.
 
-## 8. Ocultamiento Temporal de Módulos
-- **Objetivo:** Limpiar el sidebar para mostrar solo los módulos en producción actual: Dashboard, Clientes (+ Gestión Ubigeos) y Productos (+ Listado de Productos).
+## 8. Ocultamiento Temporal de Módulos (Actualizado)
+- **Objetivo:** Limpiar el sidebar para mostrar solo los módulos en producción actual.
+- **Módulos visibles actualmente:** Dashboard, Clientes (+ Gestión Ubigeos), Productos (+ Listado de Productos, + Editar Cod. Laboratorio) y **Configuración (+ Backups)**.
 - **Módulos ocultos (visibles en el código pero no en el sidebar):**
     - Providers
     - Users
     - Reports
-    - Settings
     - Audit
-- **Mecanismo:** Se cambió la propiedad `estado: true` → `estado: false` en `database.ts` para los 5 módulos. El `Sidebar.tsx` ya filtra por `mod.estado`, por lo que `false` los excluye automáticamente sin eliminar código ni rutas.
+- **Mecanismo:** Se cambió la propiedad `estado: true` → `estado: false` en `database.ts` para los módulos ocultos. El `Sidebar.tsx` ya filtra por `mod.estado`, por lo que `false` los excluye automáticamente sin eliminar código ni rutas.
 - **Restauración:** Para volver a mostrarlos, cambiar `estado: false` → `estado: true` en los mismos módulos de `database.ts`. No requiere ningún otro cambio.
 
 ## 9. Infraestructura de Despliegue (Docker)
@@ -174,5 +174,43 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
 - **Corrección:** La columna "Laboratorio" usa directamente `lab_descripcion` del JOIN de la API (independiente de `CodLab`), eliminando la función `getLabDesc` que incorrectamente buscaba laboratorios usando `CodLab` como clave.
 - **Ruta registrada en `App.tsx`:** `case '/products/edit-lab'` → `ProductsEditCodLabView`.
 
+## 11. Módulo de Configuración y Backups Automáticos
+- **Objetivo:** Reactivar el módulo Settings renombrándolo a **"Configuración"** con un sub-módulo **"Backups"** para gestionar backups automáticos de la base de datos COINSA directamente desde la interfaz web.
+- **Sidebar:**
+  - `id_modulo: 6`: Renombrado `'Settings'` → `'Configuración'`, `estado: false` → `true`.
+  - Nuevo submenú **"Backups"** (`icono: HardDrive`) con ruta `/settings/backups`.
+  - Icono `HardDrive` registrado en el resolver dinámico del `Sidebar.tsx`.
+  - `id_modulo: 12` agregado a `rolesModulos` para Enterprise Admin.
+  - Ruta `/settings/backups` registrada en `App.tsx` apuntando a `SettingsView`.
+- **Nuevos Archivos Backend:**
+  - **`src/backend/backupConfig.ts`** — Clase `BackupConfigManager` que persiste la configuración en `config/backup-config.json` (ruta destino, hora, enable/disable, estado del último backup).
+  - **`src/backend/backup/backupScheduler.ts`** — Clase `BackupScheduler` que:
+    - Usa `node-cron` para programar el backup a la hora configurada.
+    - Ejecuta `BACKUP DATABASE [COINSA] TO DISK` via el pool `mssql`.
+    - Limpia backups > 30 días con `xp_delete_file` post-backup.
+    - Métodos `start()`, `stop()`, `restart()` para control del scheduler.
+- **Nuevos Endpoints Backend:**
+  - `GET /api/config/backup` — Obtiene la configuración actual de backups.
+  - `PUT /api/config/backup` — Guarda configuración y reprograma el scheduler vía `restart()`.
+  - `POST /api/backup/run` — Ejecuta backup manual bajo demanda.
+  - Todos protegidos con `authMiddleware` y registran en auditoría.
+- **Nuevo Componente Frontend (`SettingsView.tsx`):**
+  - **Reescritura completa** del antiguo `SettingsView.tsx` con interfaz de configuración de backups.
+  - **Toggle switch** para activar/desactivar backups automáticos (con feedback visual).
+  - **Input de texto** para ruta de destino en el servidor SQL Server.
+  - **Select** con opciones de hora (7:00 PM a 3:00 AM).
+  - **Panel de estado** con información del último backup (fecha, estado, tamaño).
+  - **Botones:** "Guardar configuración" y "Ejecutar backup ahora".
+  - **Alertas** de éxito/error con temporizador de 4 segundos.
+  - Sección informativa con detalles del backup (formato .bak, retención 30 días, etc.).
+  - **Carga inicial:** Spinner mientras se obtiene la configuración del backend.
+- **Infraestructura y Despliegue:**
+  - Dependencias agregadas: `node-cron` + `@types/node-cron`.
+  - Nuevo volumen en `docker-compose.yml`: `./config:/app/config` para persistir `backup-config.json`.
+  - `config/` agregado a `.gitignore` (excepto `.gitkeep`) para evitar commits del archivo autogenerado.
+  - `README-DEPLOY.md` actualizado sección 5 con instrucciones del módulo de backups.
+- **Tipos TypeScript nuevos:**
+  - `BackupConfig` — Interfaz con `enabled`, `destinationPath`, `time`, `lastBackup`, `lastBackupSize`, `lastBackupStatus`.
+
 ---
-*Última actualización: 03 de Julio, 2026*
+*Última actualización: 07 de Julio, 2026*

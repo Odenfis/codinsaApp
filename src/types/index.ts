@@ -190,3 +190,12 @@ export interface Laboratorio {
   CodLab: string;
   Descripcion: string;
 }
+
+export interface BackupConfig {
+  enabled: boolean;
+  destinationPath: string;
+  time: string;
+  lastBackup: string | null;
+  lastBackupSize: string | null;
+  lastBackupStatus: 'success' | 'failed' | null;
+}

@@ -15,6 +15,8 @@ import { authMiddleware, AuthenticatedRequest } from './src/backend/middlewares/
 import { AuthService, DashboardService } from './src/backend/services';
 import { ClientRepository, ProviderRepository, UserRepository, ReportRepository, AuditRepository } from './src/backend/repositories';
 import { db } from './src/backend/db/database';
+import { BackupConfigManager } from './src/backend/backupConfig';
+import { BackupScheduler } from './src/backend/backup/backupScheduler';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -39,6 +41,8 @@ const providerRepo = new ProviderRepository();
 const userRepo = new UserRepository();
 const reportRepo = new ReportRepository();
 const auditRepo = new AuditRepository();
+const backupConfigManager = new BackupConfigManager();
+const backupScheduler = new BackupScheduler(backupConfigManager);
 
 // Logging Middleware
 app.use((req, res, next) => {
@@ -453,6 +457,44 @@ app.put('/api/ubigeo/cliente/:codclie', authMiddleware, async (req: Authenticate
   }
 });
 
+// ==============================================================================
+// 3c. ENDPOINTS DE CONFIGURACIÓN DE BACKUPS
+// ==============================================================================
+
+app.get('/api/config/backup', authMiddleware, (req: Request, res: Response) => {
+  return res.json({ config: backupConfigManager.getConfig() });
+});
+
+app.put('/api/config/backup', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  const { enabled, destinationPath, time } = req.body;
+  const updated = backupConfigManager.updateConfig({ enabled, destinationPath, time });
+  backupScheduler.restart();
+  db.addAuditLog(
+    req.user?.nombres + ' ' + req.user?.apellidos,
+    'Configuración',
+    `Actualizó configuración de backups: ${enabled ? 'activado' : 'desactivado'}, ruta: ${destinationPath}, hora: ${time}`,
+    req.ip
+  );
+  return res.json({ config: updated, message: 'Configuración guardada correctamente' });
+});
+
+app.post('/api/backup/run', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    await backupScheduler.executeBackup();
+    await backupScheduler.cleanupOldBackups();
+    db.addAuditLog(
+      req.user?.nombres + ' ' + req.user?.apellidos,
+      'Backups',
+      'Ejecutó backup manual de la base de datos',
+      req.ip
+    );
+    return res.json({ success: true, message: 'Backup ejecutado correctamente' });
+  } catch (err: any) {
+    console.error('[BACKUP RUN ERROR]', err);
+    return res.status(500).json({ error: 'Error al ejecutar backup: ' + err.message });
+  }
+});
+
 // CONSULTAS SQL EXPORTABLES
 app.get('/api/sql-script', (req: Request, res: Response) => {
   res.sendFile(path.join(process.cwd(), 'sql', 'database_schema.sql'));
@@ -486,6 +528,7 @@ async function setupServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`[Enterprise Admin] Tool Kit Backend & SPA en puerto ${PORT}`);
+    backupScheduler.start();
   });
 }
 

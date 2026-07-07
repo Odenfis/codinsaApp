@@ -16,6 +16,7 @@ import {
   Package,
   List,
   PenLine,
+  HardDrive,
   ChevronDown
 } from 'lucide-react';
 
@@ -50,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModu
       case 'Package': return <Package className={className} />;
       case 'List': return <List className={className} />;
       case 'PenLine': return <PenLine className={className} />;
+      case 'HardDrive': return <HardDrive className={className} />;
       default: return <FolderTree className={className} />;
     }
   };

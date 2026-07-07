@@ -50,6 +50,7 @@ const MainLayout: React.FC = () => {
       case '/users': return <UsersView />;
       case '/reports': return <ReportsView />;
       case '/settings': return <SettingsView />;
+      case '/settings/backups': return <SettingsView />;
       case '/audit': return <AuditView />;
       case '/clients/ubigeo': return <GestionUbigeoView />;
       case '/products': return <ProductsView />;

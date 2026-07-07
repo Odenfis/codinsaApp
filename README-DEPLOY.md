@@ -158,13 +158,28 @@ git stash pop
 
 ---
 
-## 5. Mantenimiento de Base de Datos
+## 5. Mantenimiento de Base de Datos y Backups
 
 El cliente mantiene su propio SQL Server. Recomendaciones:
 
-- **Backups automáticos**: Configurar en SQL Server Agent
+### 5.1 Backups Automáticos (Configuración desde la App)
+
+El sistema incluye un **módulo de backups automáticos** accesible desde `Configuración > Backups` en la interfaz web:
+
+- **Activar/Desactivar**: Toggle en la interfaz para habilitar backups diarios
+- **Ruta de destino**: Carpeta en el servidor SQL Server (ej. `C:\Backups\COINSA\`)
+- **Hora programada**: Seleccionable desde las 7:00 PM hasta las 3:00 AM
+- **Retención**: Los backups anteriores a 30 días se eliminan automáticamente
+- **Ejecución manual**: Botón "Ejecutar backup ahora" para backups bajo demanda
+- **Persistencia**: La configuración se guarda en `config/backup-config.json` (montado como volumen Docker)
+
+> El backup se genera mediante `BACKUP DATABASE [COINSA] TO DISK` directamente desde la app hacia el SQL Server del host.
+
+### 5.2 Recomendaciones adicionales
+
 - **No modificar estructura**: Los cambios de schema los gestiona el desarrollador
 - **Credenciales**: No cambiar usuario/contraseña sin avisar
+- **Espacio en disco**: Verificar que la ruta de destino tenga espacio suficiente para los backups
 
 ---
 
