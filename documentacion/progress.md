@@ -212,5 +212,37 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
 - **Tipos TypeScript nuevos:**
   - `BackupConfig` — Interfaz con `enabled`, `destinationPath`, `time`, `lastBackup`, `lastBackupSize`, `lastBackupStatus`.
 
+## 12. Asignación Masiva de Ubigeos vía API RUC (Nuevo)
+- **Objetivo:** Automatizar la asignación de ubigeos a clientes que ya tienen RUC en la tabla `[dbo].[Clientes]` pero aún no tienen registro en `[dbo].[t_Clientes_ubigeo]`, eliminando la dependencia de la asignación manual por operadores.
+- **API Externa:** Se integró `https://miapi.cloud/v1/ruc/{ruc}` con autenticación Bearer token.
+  - El token se almacena en `.env` como `API_RUC_TOKEN` (agregado también a `.env.example`).
+  - La API devuelve `domiciliado.ubigeo` (código de 6 dígitos) que se mapea directamente a `Ubigeos_SUNAT.ubigeo_6d`.
+- **Nuevo Endpoint Backend (SSE - Server-Sent Events):**
+  - `GET /api/ubigeo/asignar-masivo` — Endpoint protegido con `authMiddleware` que:
+    1. Consulta clientes con `Documento` (RUC) no vacío que **no existen** en `t_Clientes_ubigeo`.
+    2. Procesa en lotes de **3 concurrentes** (`Promise.all` con límite de concurrencia).
+    3. Por cada RUC: llama a la API externa → busca en `Ubigeos_SUNAT` por `ubigeo_6d` → hace upsert en `t_Clientes_ubigeo`.
+    4. Emite eventos SSE en vivo: `progress` (con processed/failed/skipped/total) y `complete` (con detalle completo).
+    5. Registra en auditoría el resultado de la asignación masiva.
+- **Nuevo Componente Frontend (`GestionUbigeoView.tsx`):**
+  - Botón **"Asignar Ubigeos Automáticos"** con icono `Zap` en la barra de búsqueda.
+  - Modal de progreso con:
+    - **Barra de progreso** animada con porcentaje.
+    - **Contadores en vivo**: Procesados (verde ✅), Fallidos (rojo ❌), Saltados (gris ⏭️).
+    - **Cliente actual** mostrado en tiempo real mientras se procesa.
+    - **Spinner** animado durante el proceso.
+    - Al finalizar: botón **"Copiar detalle al portapapeles"** con resumen texto de cada RUC procesado/fallido/saltado.
+    - Auto-refresh de la tabla de clientes al completar.
+  - Manejo de desconexión: `EventSource` con listener `error` para capturar fallos de red.
+- **Tipos TypeScript nuevos:**
+  - `ApiRucResponse` — Mapea la respuesta de la API RUC externa.
+  - `ProcesoMasivoEvento` — Interfaz para los eventos SSE de progreso.
+- **Archivos modificados:**
+  - `.env` y `.env.example` — Nueva variable `API_RUC_TOKEN`.
+  - `src/types/index.ts` — Nuevas interfaces.
+  - `server.ts` — Nuevo endpoint SSE (~110 líneas).
+  - `GestionUbigeoView.tsx` — Botón + modal de progreso (~160 líneas agregadas).
+- **Sin nuevas dependencias:** Usa `EventSource` nativo del navegador y SSE nativo de HTTP/Express.
+
 ---
-*Última actualización: 07 de Julio, 2026*
+*Última actualización: 08 de Julio, 2026*

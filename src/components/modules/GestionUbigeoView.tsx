@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ClienteSimple, UbigeoSunat } from '../../types';
-import { Search, MapPin, Save, X, ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ClienteSimple, UbigeoSunat, ProcesoMasivoEvento } from '../../types';
+import { Search, MapPin, Save, X, ChevronLeft, ChevronRight, Building2, Zap, CheckCircle2, XCircle, SkipForward } from 'lucide-react';
 
 export const GestionUbigeoView: React.FC = () => {
   const [clientes, setClientes] = useState<ClienteSimple[]>([]);
@@ -22,6 +22,11 @@ export const GestionUbigeoView: React.FC = () => {
 
   const [saving, setSaving] = useState(false);
   const [loadingUbigeo, setLoadingUbigeo] = useState(false);
+
+  const [showProgressModal, setShowProgressModal] = useState(false);
+  const [progressData, setProgressData] = useState<ProcesoMasivoEvento | null>(null);
+  const [processComplete, setProcessComplete] = useState(false);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const token = localStorage.getItem('toolkit_jwt');
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -169,6 +174,47 @@ export const GestionUbigeoView: React.FC = () => {
     }
   };
 
+  const startMassAssignment = () => {
+    if (eventSourceRef.current) eventSourceRef.current.close();
+    setProgressData({ processed: 0, failed: 0, skipped: 0, total: 0, currentCliente: 'Iniciando...' } as ProcesoMasivoEvento);
+    setProcessComplete(false);
+    setShowProgressModal(true);
+
+    const es = new EventSource('/api/ubigeo/asignar-masivo');
+    eventSourceRef.current = es;
+
+    es.addEventListener('progress', (e: MessageEvent) => {
+      try { setProgressData(JSON.parse(e.data)); } catch {}
+    });
+
+    es.addEventListener('complete', (e: MessageEvent) => {
+      try { setProgressData(JSON.parse(e.data)); } catch {}
+      setProcessComplete(true);
+      es.close();
+      eventSourceRef.current = null;
+      loadClientes();
+    });
+
+    es.addEventListener('error', (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        setProgressData((prev) => prev ? { ...prev, error: data.error } : { processed: 0, failed: 0, skipped: 0, total: 0, error: data.error } as ProcesoMasivoEvento);
+      } catch {}
+      setProcessComplete(true);
+      es.close();
+      eventSourceRef.current = null;
+    });
+  };
+
+  const closeProgressModal = () => {
+    if (eventSourceRef.current) { eventSourceRef.current.close(); eventSourceRef.current = null; }
+    setShowProgressModal(false);
+  };
+
+  const progressPercent = progressData && progressData.total > 0
+    ? Math.round(((progressData.processed + progressData.failed + progressData.skipped) / progressData.total) * 100)
+    : 0;
+
   const totalPages = Math.ceil(clientes.length / itemsPerPage) || 1;
   const paginatedClientes = clientes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
@@ -188,8 +234,8 @@ export const GestionUbigeoView: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-surface-container-lowest p-4 rounded-xl border border-surface-variant shadow-sm flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-lg">
+      <div className="bg-surface-container-lowest p-4 rounded-xl border border-surface-variant shadow-sm flex items-center justify-between gap-4 flex-wrap">
+        <div className="relative flex-1 max-w-lg min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-outline" size={18} />
           <input
             type="text"
@@ -199,8 +245,18 @@ export const GestionUbigeoView: React.FC = () => {
             className="w-full bg-surface border border-outline-variant rounded-lg pl-10 pr-4 py-2 text-sm text-on-surface focus:border-primary focus:outline-none"
           />
         </div>
-        <div className="text-xs font-bold text-outline">
-          Total: <span className="text-primary">{clientes.length}</span> clientes
+        <div className="flex items-center gap-3">
+          <button
+            onClick={startMassAssignment}
+            disabled={processComplete && !showProgressModal}
+            className="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-surface-tint transition-colors flex items-center gap-1.5"
+          >
+            <Zap size={14} />
+            Asignar Ubigeos Automáticos
+          </button>
+          <div className="text-xs font-bold text-outline">
+            Total: <span className="text-primary">{clientes.length}</span> clientes
+          </div>
         </div>
       </div>
 
@@ -248,6 +304,140 @@ export const GestionUbigeoView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {showProgressModal && (
+        <div className="fixed inset-0 bg-on-surface/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-surface-container-lowest rounded-xl border border-surface-variant shadow-lg max-w-lg w-full p-6 animate-fade-in">
+            <div className="flex items-start justify-between mb-4 pb-2 border-b border-surface-variant">
+              <div>
+                <h3 className="font-headline text-lg font-bold text-on-surface">Asignación Masiva de Ubigeos</h3>
+                <p className="text-xs text-on-surface-variant mt-0.5">
+                  {progressData?.error ? 'Error en el proceso' :
+                   processComplete ? 'Proceso finalizado' :
+                   'Consultando API RUC de SUNAT...'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {!progressData?.error && (
+                <div>
+                  <div className="flex justify-between text-xs text-on-surface-variant mb-1.5">
+                    <span>Progreso</span>
+                    <span>{progressPercent}%</span>
+                  </div>
+                  <div className="w-full bg-surface-variant rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${processComplete ? 'bg-green-500' : 'bg-primary'}`}
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {progressData?.error && (
+                <div className="bg-error-container text-error p-3 rounded-lg text-xs flex items-start gap-2">
+                  <XCircle size={16} className="mt-0.5 shrink-0" />
+                  <span>{progressData.error}</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-surface-container rounded-lg p-3 text-center">
+                  <div className="flex items-center justify-center gap-1 text-green-600 font-bold text-lg">
+                    <CheckCircle2 size={16} />
+                    {progressData?.processed ?? 0}
+                  </div>
+                  <div className="text-[10px] text-on-surface-variant mt-0.5">Procesados</div>
+                </div>
+                <div className="bg-surface-container rounded-lg p-3 text-center">
+                  <div className="flex items-center justify-center gap-1 text-red-500 font-bold text-lg">
+                    <XCircle size={16} />
+                    {progressData?.failed ?? 0}
+                  </div>
+                  <div className="text-[10px] text-on-surface-variant mt-0.5">Fallidos</div>
+                </div>
+                <div className="bg-surface-container rounded-lg p-3 text-center">
+                  <div className="flex items-center justify-center gap-1 text-outline font-bold text-lg">
+                    <SkipForward size={16} />
+                    {progressData?.skipped ?? 0}
+                  </div>
+                  <div className="text-[10px] text-on-surface-variant mt-0.5">Saltados</div>
+                </div>
+              </div>
+
+              {progressData?.currentCliente && !processComplete && (
+                <div className="bg-surface-container rounded-lg p-3">
+                  <div className="text-xs text-on-surface-variant">Procesando:</div>
+                  <div className="text-sm font-bold text-on-surface truncate">{progressData.currentCliente}</div>
+                  {progressData.currentRuc && (
+                    <div className="text-xs text-outline font-mono">{progressData.currentRuc}</div>
+                  )}
+                </div>
+              )}
+
+              {!progressData?.error && !processComplete && (
+                <div className="flex items-center justify-center gap-2 text-xs text-outline">
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  Procesando...
+                </div>
+              )}
+
+              {processComplete && progressData?.detalles && progressData.detalles.length > 0 && (
+                <div>
+                  <button
+                    onClick={() => {
+                      const text = progressData.detalles!.map(d =>
+                        `[${d.estado.toUpperCase()}] ${d.cliente} (${d.ruc})${d.mensaje ? ': ' + d.mensaje : ''}`
+                      ).join('\n');
+                      navigator.clipboard.writeText(text);
+                    }}
+                    className="text-xs text-primary hover:underline mb-2 inline-block"
+                  >
+                    Copiar detalle al portapapeles
+                  </button>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-surface-variant">
+                {processComplete && (
+                  <button
+                    onClick={() => {
+                      closeProgressModal();
+                      setShowProgressModal(false);
+                    }}
+                    className="px-5 py-2 bg-primary text-on-primary rounded text-xs font-bold hover:bg-surface-tint transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                )}
+                {!processComplete && !progressData?.error && (
+                  <button
+                    onClick={() => {
+                      closeProgressModal();
+                      setShowProgressModal(false);
+                    }}
+                    className="px-4 py-2 border border-outline-variant rounded text-xs font-bold hover:bg-surface"
+                  >
+                    Cancelar
+                  </button>
+                )}
+                {progressData?.error && (
+                  <button
+                    onClick={() => {
+                      closeProgressModal();
+                      setShowProgressModal(false);
+                    }}
+                    className="px-5 py-2 bg-primary text-on-primary rounded text-xs font-bold hover:bg-surface-tint transition-colors"
+                  >
+                    Cerrar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && selectedClient && (
         <div className="fixed inset-0 bg-on-surface/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">

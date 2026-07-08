@@ -191,6 +191,41 @@ export interface Laboratorio {
   Descripcion: string;
 }
 
+export interface ApiRucResponse {
+  success: boolean;
+  datos: {
+    ruc: string;
+    razon_social: string;
+    estado: string;
+    condicion: string;
+    domiciliado: {
+      direccion: string;
+      distrito: string;
+      provincia: string;
+      departamento: string;
+      ubigeo: string;
+    };
+  };
+}
+
+export interface ProcesoMasivoEvento {
+  type: 'progress' | 'complete' | 'error';
+  processed: number;
+  failed: number;
+  skipped: number;
+  total: number;
+  currentRuc?: string;
+  currentCliente?: string;
+  message?: string;
+  error?: string;
+  detalles?: Array<{
+    ruc: string;
+    cliente: string;
+    estado: 'procesado' | 'fallido' | 'saltado';
+    mensaje?: string;
+  }>;
+}
+
 export interface BackupConfig {
   enabled: boolean;
   destinationPath: string;
