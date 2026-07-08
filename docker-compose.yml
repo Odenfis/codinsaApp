@@ -30,6 +30,7 @@ services:
       - DB_PASSWORD=2026
       - DB_NAME=COINSA
       - SESSION_SECRET=${SESSION_SECRET:-ToolKit_SecureKey_2026_Enterprise}
+      - API_RUC_TOKEN=${API_RUC_TOKEN}
     volumes:
       # Persiste la configuración de backups entre rebuilds del contenedor
       - ./config:/app/config
