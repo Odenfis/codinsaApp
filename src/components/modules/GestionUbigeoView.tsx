@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ClienteSimple, UbigeoSunat, ProcesoMasivoEvento } from '../../types';
-import { Search, MapPin, Save, X, ChevronLeft, ChevronRight, Building2, Zap, CheckCircle2, XCircle, SkipForward } from 'lucide-react';
+import { Search, MapPin, Save, X, ChevronLeft, ChevronRight, Building2, Zap, CheckCircle2, XCircle, SkipForward, User } from 'lucide-react';
 
 export const GestionUbigeoView: React.FC = () => {
   const [clientes, setClientes] = useState<ClienteSimple[]>([]);
@@ -206,6 +206,38 @@ export const GestionUbigeoView: React.FC = () => {
     });
   };
 
+  const startMassAssignmentDni = () => {
+    if (eventSourceRef.current) eventSourceRef.current.close();
+    setProgressData({ processed: 0, failed: 0, skipped: 0, total: 0, currentCliente: 'Iniciando...' } as ProcesoMasivoEvento);
+    setProcessComplete(false);
+    setShowProgressModal(true);
+
+    const es = new EventSource('/api/ubigeo/asignar-masivo-dni');
+    eventSourceRef.current = es;
+
+    es.addEventListener('progress', (e: MessageEvent) => {
+      try { setProgressData(JSON.parse(e.data)); } catch {}
+    });
+
+    es.addEventListener('complete', (e: MessageEvent) => {
+      try { setProgressData(JSON.parse(e.data)); } catch {}
+      setProcessComplete(true);
+      es.close();
+      eventSourceRef.current = null;
+      loadClientes();
+    });
+
+    es.addEventListener('error', (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        setProgressData((prev) => prev ? { ...prev, error: data.error } : { processed: 0, failed: 0, skipped: 0, total: 0, error: data.error } as ProcesoMasivoEvento);
+      } catch {}
+      setProcessComplete(true);
+      es.close();
+      eventSourceRef.current = null;
+    });
+  };
+
   const closeProgressModal = () => {
     if (eventSourceRef.current) { eventSourceRef.current.close(); eventSourceRef.current = null; }
     setShowProgressModal(false);
@@ -252,7 +284,15 @@ export const GestionUbigeoView: React.FC = () => {
             className="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-surface-tint transition-colors flex items-center gap-1.5"
           >
             <Zap size={14} />
-            Asignar Ubigeos Automáticos
+            Asignar Ubigeos RUC
+          </button>
+          <button
+            onClick={startMassAssignmentDni}
+            disabled={processComplete && !showProgressModal}
+            className="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:bg-surface-tint transition-colors flex items-center gap-1.5"
+          >
+            <User size={14} />
+            Asignar Ubigeos DNI
           </button>
           <div className="text-xs font-bold text-outline">
             Total: <span className="text-primary">{clientes.length}</span> clientes

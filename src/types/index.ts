@@ -208,6 +208,23 @@ export interface ApiRucResponse {
   };
 }
 
+export interface ApiDniResponse {
+  success: boolean;
+  datos: {
+    dni: string;
+    nombres: string;
+    ape_paterno: string;
+    ape_materno: string;
+    domiciliado: {
+      direccion: string;
+      distrito: string;
+      provincia: string;
+      departamento: string;
+      ubigeo: string;
+    };
+  };
+}
+
 export interface ProcesoMasivoEvento {
   type: 'progress' | 'complete' | 'error';
   processed: number;

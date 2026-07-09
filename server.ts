@@ -575,7 +575,124 @@ app.get('/api/ubigeo/asignar-masivo', authMiddleware, async (req: AuthenticatedR
 });
 
 // ==============================================================================
-// 3d. ENDPOINTS DE CONFIGURACIÓN DE BACKUPS
+// 3d. ASIGNACIÓN MASIVA DE UBIGEOS VÍA API DNI (SSE)
+// ==============================================================================
+
+app.get('/api/ubigeo/asignar-masivo-dni', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const sendEvent = (event: string, data: any) => {
+    try { res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch {}
+  };
+
+  const close = () => {
+    try { res.end(); } catch {}
+  };
+
+  req.on('close', close);
+
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request().query(`
+      SELECT c.Codclie, c.Razon, c.Documento
+      FROM Clientes c
+      WHERE LEN(c.Documento) = 8
+        AND NOT EXISTS (SELECT 1 FROM t_Clientes_ubigeo u WHERE u.CODIGO = c.Codclie)
+      ORDER BY c.Razon
+    `);
+
+    const clientes = result.recordset;
+    const total = clientes.length;
+
+    if (total === 0) {
+      sendEvent('complete', { processed: 0, failed: 0, skipped: 0, total: 0, detalles: [], message: 'No hay clientes DNI pendientes de asignación.' });
+      close(); return;
+    }
+
+    let processed = 0, failed = 0, skipped = 0;
+    const detalles: Array<{dni: string; cliente: string; estado: string; mensaje?: string}> = [];
+    const API_TOKEN = (process.env.API_RUC_TOKEN || '').trim();
+    const CONCURRENCY = 3;
+
+    sendEvent('progress', { processed: 0, failed: 0, skipped: 0, total, currentRuc: '', currentCliente: 'Iniciando proceso...' });
+
+    for (let i = 0; i < clientes.length; i += CONCURRENCY) {
+      const batch = clientes.slice(i, i + CONCURRENCY);
+      const promises = batch.map(async (cliente: any) => {
+        const dni = (cliente.Documento || '').trim();
+        if (!dni) { skipped++; detalles.push({ dni, cliente: cliente.Razon, estado: 'saltado', mensaje: 'DNI vacío' }); return; }
+
+        try {
+          const apiRes = await fetch(`https://miapi.cloud/v1/dni/${dni}`, {
+            headers: { Authorization: `Bearer ${API_TOKEN}` }
+          });
+          if (!apiRes.ok) { failed++; detalles.push({ dni, cliente: cliente.Razon, estado: 'fallido', mensaje: `API responded ${apiRes.status}` }); return; }
+
+          const apiData = await apiRes.json();
+          if (!apiData.success || !apiData.datos?.domiciliado?.ubigeo) {
+            skipped++; detalles.push({ dni, cliente: cliente.Razon, estado: 'saltado', mensaje: 'API no devolvió ubigeo' }); return;
+          }
+
+          const ubigeoCode = apiData.datos.domiciliado.ubigeo;
+          const ubRes = await pool.request()
+            .input('ubigeo', sql.Char(6), ubigeoCode)
+            .query(`SELECT cod_dpto, cod_prov, cod_dist FROM Ubigeos_SUNAT WHERE ubigeo_6d = @ubigeo`);
+
+          if (ubRes.recordset.length === 0) {
+            skipped++; detalles.push({ dni, cliente: cliente.Razon, estado: 'saltado', mensaje: `Ubigeo ${ubigeoCode} no encontrado en catálogo` }); return;
+          }
+
+          const { cod_dpto, cod_prov, cod_dist } = ubRes.recordset[0];
+          const existsCheck = await pool.request()
+            .input('codclie', sql.Int, cliente.Codclie)
+            .query(`SELECT COUNT(*) AS cnt FROM t_Clientes_ubigeo WHERE CODIGO = @codclie`);
+
+          const upsertReq = pool.request()
+            .input('codclie', sql.Int, cliente.Codclie)
+            .input('ruc_dni', sql.Char(12), dni)
+            .input('dpto', sql.Int, parseInt(cod_dpto))
+            .input('provincia', sql.Int, parseInt(cod_prov))
+            .input('distrito', sql.Int, parseInt(cod_dist))
+            .input('ubigeo', sql.Char(6), ubigeoCode);
+
+          if (existsCheck.recordset[0].cnt > 0) {
+            await upsertReq.query(`UPDATE t_Clientes_ubigeo SET ruc_dni = @ruc_dni, dpto = @dpto, provincia = @provincia, distrito = @distrito, UBIGEO = @ubigeo, NUBIGEO = @ubigeo WHERE CODIGO = @codclie`);
+          } else {
+            await upsertReq.query(`INSERT INTO t_Clientes_ubigeo (CODIGO, ruc_dni, dpto, provincia, distrito, UBIGEO, NUBIGEO) VALUES (@codclie, @ruc_dni, @dpto, @provincia, @distrito, @ubigeo, @ubigeo)`);
+          }
+
+          processed++;
+          detalles.push({ dni, cliente: cliente.Razon, estado: 'procesado' });
+        } catch (err: any) {
+          failed++;
+          detalles.push({ dni, cliente: cliente.Razon, estado: 'fallido', mensaje: err.message });
+        }
+      });
+
+      await Promise.all(promises);
+      const last = batch[batch.length - 1];
+      sendEvent('progress', { processed, failed, skipped, total, currentRuc: last?.Documento || '', currentCliente: last?.Razon || '' });
+    }
+
+    try {
+      db.addAuditLog(req.user?.nombres + ' ' + req.user?.apellidos, 'Ubigeo', `Asignación masiva DNI: ${processed} procesados, ${failed} fallidos, ${skipped} saltados (${total} totales)`, req.ip);
+    } catch {}
+
+    sendEvent('complete', { processed, failed, skipped, total, message: `Proceso DNI completado. ${processed} procesados, ${failed} fallidos, ${skipped} saltados.`, detalles });
+    close();
+  } catch (err: any) {
+    console.error('[UBIGEO MASIVO DNI ERROR]', err);
+    sendEvent('error', { error: err.message || 'Error interno del servidor.' });
+    close();
+  }
+});
+
+// ==============================================================================
+// 3e. ENDPOINTS DE CONFIGURACIÓN DE BACKUPS
 // ==============================================================================
 
 app.get('/api/config/backup', authMiddleware, (req: Request, res: Response) => {

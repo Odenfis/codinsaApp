@@ -244,5 +244,43 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
   - `GestionUbigeoView.tsx` — Botón + modal de progreso (~160 líneas agregadas).
 - **Sin nuevas dependencias:** Usa `EventSource` nativo del navegador y SSE nativo de HTTP/Express.
 
+## 13. Fix: Token API RUC en despliegue Docker
+- **Problema:** El cliente reportó que todas las consultas RUC fallaban con `API responded 401` durante la asignación masiva de ubigeos.
+- **Causa raíz:** El token `API_RUC_TOKEN` en `.env` había agotado su cuota de consultas en `miapi.cloud`. Además, en despliegue Docker el contenedor no recibía la variable porque:
+  - `docker-compose.yml` no incluía `API_RUC_TOKEN` en la sección `environment`.
+  - `.env` estaba excluido vía `.dockerignore` y no existía en el servidor del cliente.
+- **Solución aplicada en `docker-compose.yml`:**
+  - Se agregó `API_RUC_TOKEN=d97f7abd-3a43-4c6c-b7e9-9e1e84b9e919` hardcodeado en `environment` (solución temporal para proceso único, luego se recomienda usar `${API_RUC_TOKEN}` con un `.env` en el servidor).
+- **Lección:** En despliegues Docker, las variables de entorno deben declararse explícitamente en `docker-compose.yml`. El archivo `.env` local del desarrollo no se transfiere automáticamente al contenedor en producción.
+
+## 14. Asignación Masiva de Ubigeos vía API DNI (Nuevo)
+- **Objetivo:** Extender la asignación automática de ubigeos a clientes con **DNI** (8 dígitos) en `[dbo].[Clientes]`, sin afectar los registros RUC ya procesados en `[dbo].[t_Clientes_ubigeo]`.
+- **API Externa:** Se integró `https://miapi.cloud/v1/dni/{dni}` — mismo dominio, mismo `API_RUC_TOKEN` que el endpoint RUC.
+  - La respuesta tiene estructura idéntica para ubigeo: `success → datos → domiciliado → ubigeo`.
+  - El DNI se distingue del RUC por **longitud**: 8 dígitos = DNI, 11 dígitos = RUC.
+- **Nuevo Endpoint Backend (SSE):**
+  - `GET /api/ubigeo/asignar-masivo-dni` — Endpoint protegido con `authMiddleware` que:
+    1. Consulta clientes con `LEN(Documento) = 8` que **no existen** en `t_Clientes_ubigeo`.
+    2. Procesa en lotes de **3 concurrentes** (misma estrategia que RUC).
+    3. Por cada DNI: llama a la API externa → busca en `Ubigeos_SUNAT` por `ubigeo_6d` → hace upsert en `t_Clientes_ubigeo`.
+    4. Emite eventos SSE en vivo: `progress` y `complete`.
+    5. Registra en auditoría con etiqueta "Asignación masiva DNI".
+- **Modificación Frontend (`GestionUbigeoView.tsx`):**
+  - Botón existente renombrado de "Asignar Ubigeos Automáticos" → **"Asignar Ubigeos RUC"**.
+  - Nuevo botón **"Asignar Ubigeos DNI"** con icono `User` en la barra de búsqueda.
+  - Nueva función `startMassAssignmentDni()` que conecta al endpoint SSE de DNI.
+  - **Reutiliza el mismo modal de progreso** (barra, contadores, copiar detalle).
+- **Compatibilidad con el proceso RUC existente (garantizada):**
+  - `LEN(Documento) = 8` filtra exclusivamente DNI — los RUC (11 dígitos) no se seleccionan.
+  - `NOT EXISTS` en `t_Clientes_ubigeo` excluye clientes ya procesados (todos los RUC).
+  - El código del endpoint RUC no fue modificado — proceso completamente aislado.
+- **Tipos TypeScript nuevos:**
+  - `ApiDniResponse` — Mapea la respuesta de la API DNI externa con campos `dni`, `nombres`, `ape_paterno`, `ape_materno` y `domiciliado.ubigeo`.
+- **Archivos modificados:**
+  - `src/types/index.ts` — Nueva interfaz `ApiDniResponse`.
+  - `server.ts` — Nuevo endpoint SSE (~110 líneas).
+  - `GestionUbigeoView.tsx` — Botón DNI + función `startMassAssignmentDni`.
+- **Sin nuevas dependencias:** Mismo `EventSource`, mismo `API_RUC_TOKEN`, misma lógica de upsert reutilizada.
+
 ---
-*Última actualización: 08 de Julio, 2026*
+*Última actualización: 09 de Julio, 2026*
