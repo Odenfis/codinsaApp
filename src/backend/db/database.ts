@@ -26,13 +26,14 @@ class EnterpriseDatabase {
     { id_modulo: 4, nombre_modulo: 'Users', icono: 'UserCheck', ruta: '/users', orden: 5, estado: false },
     { id_modulo: 5, nombre_modulo: 'Reports', icono: 'BarChart3', ruta: '/reports', orden: 6, estado: false },
     { id_modulo: 6, nombre_modulo: 'Configuración', icono: 'Settings', ruta: '/settings', orden: 7, estado: true, children: [
-      { id_modulo: 12, nombre_modulo: 'Backups', icono: 'HardDrive', ruta: '/settings/backups', orden: 1, estado: true }
+      { id_modulo: 12, nombre_modulo: 'Backups', icono: 'HardDrive', ruta: '/settings/backups', orden: 1, estado: true },
+      { id_modulo: 13, nombre_modulo: 'Nisira Export', icono: 'FileDown', ruta: '/settings/nisira-export', orden: 2, estado: true }
     ] },
     { id_modulo: 7, nombre_modulo: 'Audit', icono: 'ShieldCheck', ruta: '/audit', orden: 8, estado: false }
   ];
 
   public rolesModulos: Record<number, number[]> = {
-    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], // Enterprise Admin: todo
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], // Enterprise Admin: todo
     2: [1, 2, 3, 5, 7],                      // Auditor: todo menos users, settings, productos (sólo lectura)
     3: [1, 2, 3, 5, 9, 10, 11]               // Gestor operativo: incluye productos
   };

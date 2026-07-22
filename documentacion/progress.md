@@ -282,5 +282,46 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
   - `GestionUbigeoView.tsx` — Botón DNI + función `startMassAssignmentDni`.
 - **Sin nuevas dependencias:** Mismo `EventSource`, mismo `API_RUC_TOKEN`, misma lógica de upsert reutilizada.
 
+## 15. Módulo Nisira Export (Nuevo)
+- **Objetivo:** Exportar los datos de la tabla `[dbo].[tablaNisira]` (~80 campos) a un archivo **.dbf** (dBase III) para interoperabilidad con sistemas SUNAT y sistemas contables legacy.
+- **Sidebar:**
+  - Nuevo submenú **"Nisira Export"** (`icono: FileDown`) bajo Configuración, con ruta `/settings/nisira-export`.
+  - Icono `FileDown` registrado en el resolver dinámico del `Sidebar.tsx`.
+  - Módulo `id_modulo: 13` agregado a `rolesModulos` para Enterprise Admin.
+- **Nueva Dependencia:**
+  - `dbffile` v1.12.0 — Librería para crear archivos .dbf (dBase III/IV/FoxPro) desde Node.js.
+- **Nuevos Archivos:**
+  - **`src/types/nisira.ts`** — Interface `TablaNisira` con los ~80 campos de la tabla + `NisiraExportResponse`.
+  - **`src/backend/services/NisiraExportService.ts`** — Service que:
+    - Consulta `SELECT * FROM [dbo].[tablaNisira]` via pool `mssql`.
+    - Define field descriptors para cada columna (tipo C, N, D según corresponda).
+    - Convierte valores numéricos (`BIGINT`, `DECIMAL`, `INT`) de `string` a `Number` para compatibilidad con `dbffile`.
+    - Convierte fechas (`DATE`) a objetos `Date` de JavaScript.
+    - Genera archivo .dbf temporal en `os.tmpdir()` con nombre `NisiraExport_YYYYMMDD_HHMMSS.dbf`.
+    - Limpia el archivo temporal post-descarga.
+  - **`src/components/modules/NisiraExportView.tsx`** — Vista con:
+    - Botón **"Exportar a DBF"** que primero consulta el conteo de registros.
+    - Modal de confirmación mostrando la cantidad de registros a exportar.
+    - Descarga del archivo .dbf vía `GET /api/nisira/export` (el navegador muestra el diálogo "Guardar como").
+    - Alertas de éxito/error con iconos `CheckCircle`/`XCircle`.
+    - Panel informativo con detalles del formato y la tabla origen.
+- **Nuevo Endpoint Backend:**
+  - `GET /api/nisira/export?count=true` — Retorna `{ success, count }` con el total de registros.
+  - `GET /api/nisira/export` — Genera el archivo .dbf y lo envía como `res.download()`.
+  - Protegido con `authMiddleware`, registra en auditoría con la cantidad de registros exportados.
+- **Bugs encontrados y corregidos durante desarrollo:**
+  - **`expected a number`:** Los campos `BIGINT`, `DECIMAL` e `INT` llegaban como `string` desde SQL Server. Se agregó conversión a `Number` en `mapRecord()` basada en los field descriptors de tipo `N`.
+  - **`EEXIST: file already exists`:** El nombre del archivo temporal solo usaba la fecha, generando conflictos en exportaciones同一 día. Se agregó timestamp (`HHMMSS`) al nombre y limpieza previa con `fs.existsSync` + `fs.unlinkSync`.
+- **Archivos modificados:**
+  - `src/types/index.ts` — Re-export de `TablaNisira` y `NisiraExportResponse`.
+  - `server.ts` — Nuevo endpoint `GET /api/nisira/export` (~25 líneas).
+  - `src/backend/db/database.ts` — Módulo `id_modulo: 13` agregado a Configuración y a `rolesModulos[1]`.
+  - `src/components/layout/Sidebar.tsx` — Import + case para `FileDown`.
+  - `src/App.tsx` — Import + ruta `'/settings/nisira-export'` → `NisiraExportView`.
+- **Prueba de exportación exitosa:**
+  - 10 registros exportados, 86 campos, archivo .dbf de 38,607 bytes.
+  - Formato dBase III (cabecera `0x03`) válido y readable por `DBFFile.open()`.
+  - Valores numéricos, fechas y strings correctamente mapeados.
+
 ---
-*Última actualización: 09 de Julio, 2026*
+*Última actualización: 22 de Julio, 2026*

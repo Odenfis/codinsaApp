@@ -251,3 +251,5 @@ export interface BackupConfig {
   lastBackupSize: string | null;
   lastBackupStatus: 'success' | 'failed' | null;
 }
+
+export type { TablaNisira, NisiraExportResponse } from './nisira';

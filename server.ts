@@ -7,6 +7,7 @@
 
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
+import fs from 'fs';
 import session from 'express-session';
 import { createServer as createViteServer } from 'vite';
 import { getDbPool, sql } from './src/db';
@@ -17,6 +18,7 @@ import { ClientRepository, ProviderRepository, UserRepository, ReportRepository,
 import { db } from './src/backend/db/database';
 import { BackupConfigManager } from './src/backend/backupConfig';
 import { BackupScheduler } from './src/backend/backup/backupScheduler';
+import { getNisiraCount, exportNisiraToDbf } from './src/backend/services/NisiraExportService';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -726,6 +728,42 @@ app.post('/api/backup/run', authMiddleware, async (req: AuthenticatedRequest, re
   } catch (err: any) {
     console.error('[BACKUP RUN ERROR]', err);
     return res.status(500).json({ error: 'Error al ejecutar backup: ' + err.message });
+  }
+});
+
+// ==============================================================================
+// 3f. ENDPOINT DE NISIRA EXPORT (DBF)
+// ==============================================================================
+
+app.get('/api/nisira/export', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const countOnly = req.query.count === 'true';
+
+    if (countOnly) {
+      const count = await getNisiraCount();
+      return res.json({ success: true, count });
+    }
+
+    const { tempPath, count, filename } = await exportNisiraToDbf();
+
+    db.addAuditLog(
+      req.user?.nombres + ' ' + req.user?.apellidos,
+      'Nisira Export',
+      `Exportó tabla Nisira a DBF - ${count} registros exportados`,
+      req.ip
+    );
+
+    res.download(tempPath, filename, (err) => {
+      if (err) {
+        console.error('[NISIRA DOWNLOAD ERROR]', err);
+      }
+      fs.unlink(tempPath, () => {});
+    });
+  } catch (err: any) {
+    console.error('[NISIRA EXPORT ERROR]', err);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Error al exportar: ' + err.message });
+    }
   }
 });
 

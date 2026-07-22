@@ -19,6 +19,7 @@ import { AuditView } from './components/modules/AuditView';
 import { GestionUbigeoView } from './components/modules/GestionUbigeoView';
 import { ProductsView } from './components/modules/ProductsView';
 import { ProductsEditCodLabView } from './components/modules/ProductsEditCodLabView';
+import { NisiraExportView } from './components/modules/NisiraExportView';
 import { SqlModal } from './components/sql/SqlModal';
 
 const MainLayout: React.FC = () => {
@@ -51,6 +52,7 @@ const MainLayout: React.FC = () => {
       case '/reports': return <ReportsView />;
       case '/settings': return <SettingsView />;
       case '/settings/backups': return <SettingsView />;
+      case '/settings/nisira-export': return <NisiraExportView />;
       case '/audit': return <AuditView />;
       case '/clients/ubigeo': return <GestionUbigeoView />;
       case '/products': return <ProductsView />;
