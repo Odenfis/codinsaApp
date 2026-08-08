@@ -323,5 +323,21 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
   - Formato dBase III (cabecera `0x03`) válido y readable por `DBFFile.open()`.
   - Valores numéricos, fechas y strings correctamente mapeados.
 
+## 16. Nisira Export: Ejecución previa del SP `sp_Exporta_Nisira`
+- **Objetivo:** Permitir que, antes de exportar la tabla Nisira, el sistema ejecute el stored procedure `[dbo].[sp_Exporta_Nisira]` con los parámetros **Día, Mes y Año** (tal como requiere el SP) para que regenere los datos de `[dbo].[tablaNisira]` con las facturas, boletas, notas de crédito y guías de la fecha indicada.
+- **Flujo definido (2 pasos):**
+  1. **1 · Generar tabla Nisira (Ejecutar SP):** El usuario ingresa Día / Mes / Año y presiona "Ejecutar SP y generar tabla". Al terminar, mostrará la cantidad de registros generados y abrirá automáticamente el modal de confirmación de exportación.
+  2. **2 · Exportar a DBF:** Botón existente, exporta el contenido actual de `[dbo].[tablaNisira]` a `.dbf`.
+- **Nuevo Endpoint Backend:**
+  - `POST /api/nisira/generar` — Ejecuta `sp_Exporta_Nisira` mediante `pool.request().input('dia', sql.Int)... .execute()`, valida Día (1-31), Mes (1-12) y Año (2000-2100), responde `{ success, count }` y registra en auditoría la fecha y cantidad generada. Ante fallo a mitad (el SP hace `delete` + inserts), devuelve un error claro avisando que la tabla pudo quedar incompleta.
+- **Nueva función en el Service (`NisiraExportService.ts`):**
+  - `runNisiraSp(dia, mes, anio)` — Ejecuta `EXEC [dbo].[sp_Exporta_Nisira]` con inputs tipados `sql.Int` y devuelve el conteo real de la tabla tras la ejecución.
+- **Modificación Frontend (`NisiraExportView.tsx`):**
+  - Nueva tarjeta **"1 · Generar tabla Nisira (Ejecutar SP)"** con tres inputs numéricos **Día / Mes / Año** prellenados con la fecha actual y botón con spinner mientras corre el SP.
+  - La tarjeta existente de exportación pasó a llamarse **"2 · Exportar a DBF"**.
+  - Panel de información actualizado con el nuevo flujo.
+- **Compatibilidad:** La exportación (`GET /api/nisira/export`) no fue modificada; si se usa sin generar, exporta el contenido actual de la tabla.
+- **Sin dependencias nuevas:** El SP no se modifica; solo se invoca con parámetros tipados.
+
 ---
-*Última actualización: 22 de Julio, 2026*
+*Última actualización: 08 de Agosto, 2026*

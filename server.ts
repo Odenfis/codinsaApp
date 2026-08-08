@@ -18,7 +18,7 @@ import { ClientRepository, ProviderRepository, UserRepository, ReportRepository,
 import { db } from './src/backend/db/database';
 import { BackupConfigManager } from './src/backend/backupConfig';
 import { BackupScheduler } from './src/backend/backup/backupScheduler';
-import { getNisiraCount, exportNisiraToDbf } from './src/backend/services/NisiraExportService';
+import { getNisiraCount, exportNisiraToDbf, runNisiraSp } from './src/backend/services/NisiraExportService';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -728,6 +728,40 @@ app.post('/api/backup/run', authMiddleware, async (req: AuthenticatedRequest, re
   } catch (err: any) {
     console.error('[BACKUP RUN ERROR]', err);
     return res.status(500).json({ error: 'Error al ejecutar backup: ' + err.message });
+  }
+});
+
+// ==============================================================================
+// 3f1. ENDPOINT PARA EJECUTAR SP DE NISIRA (GENERAR TABLA)
+// ==============================================================================
+
+app.post('/api/nisira/generar', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const dia = Number(req.body?.dia);
+    const mes = Number(req.body?.mes);
+    const anio = Number(req.body?.anio);
+
+    if (!Number.isInteger(dia) || dia < 1 || dia > 31 ||
+        !Number.isInteger(mes) || mes < 1 || mes > 12 ||
+        !Number.isInteger(anio) || anio < 2000 || anio > 2100) {
+      return res.status(400).json({ error: 'Parámetros inválidos: Día (1-31), Mes (1-12) y Año (2000-2100) son requeridos.' });
+    }
+
+    const { count } = await runNisiraSp(dia, mes, anio);
+
+    db.addAuditLog(
+      req.user?.nombres + ' ' + req.user?.apellidos,
+      'Nisira Export',
+      `Ejecutó SP sp_Exporta_Nisira para ${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}/${anio} - ${count} registros generados`,
+      req.ip
+    );
+
+    return res.json({ success: true, count });
+  } catch (err: any) {
+    console.error('[NISIRA GENERAR ERROR]', err);
+    return res.status(500).json({
+      error: 'Error al ejecutar el stored procedure sp_Exporta_Nisira. La tabla tablaNisira podría haber quedado incompleta. Detalle: ' + err.message
+    });
   }
 });
 

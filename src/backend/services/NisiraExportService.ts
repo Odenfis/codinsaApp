@@ -1,4 +1,4 @@
-import { getDbPool } from '../../db';
+import { getDbPool, sql } from '../../db';
 import { DBFFile, FieldDescriptor } from 'dbffile';
 import path from 'path';
 import fs from 'fs';
@@ -135,6 +135,17 @@ export async function getNisiraCount(): Promise<number> {
   const result = await pool.request()
     .query('SELECT COUNT(*) AS total FROM [dbo].[tablaNisira]');
   return result.recordset[0].total;
+}
+
+export async function runNisiraSp(dia: number, mes: number, anio: number): Promise<{ count: number }> {
+  const pool = await getDbPool();
+  await pool.request()
+    .input('dia', sql.Int, dia)
+    .input('mes', sql.Int, mes)
+    .input('anio', sql.Int, anio)
+    .execute('[dbo].[sp_Exporta_Nisira]');
+  const count = await getNisiraCount();
+  return { count };
 }
 
 export async function exportNisiraToDbf(): Promise<{ tempPath: string; count: number; filename: string }> {
