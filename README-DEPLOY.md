@@ -181,6 +181,39 @@ El sistema incluye un **módulo de backups automáticos** accesible desde `Confi
 - **Credenciales**: No cambiar usuario/contraseña sin avisar
 - **Espacio en disco**: Verificar que la ruta de destino tenga espacio suficiente para los backups
 
+### 5.3 Nisira Export Direct (archivos .dbf a ruta compartida de red)
+
+El módulo **`Configuración > Nisira Export Direct`** genera el archivo `.dbf` directamente en la carpeta compartida de red `X:\FACTURACION_EDOC_CODINSA\DBFCODINSA\` (share **`contasoft`**), sin descargar por el navegador, para que otro sistema/operador lo lea desde esa ruta.
+
+**Topología (importante):** la app corre en la misma máquina `SERVER` que comparte la carpeta `contasoft`. La letra `X:` es el share `contasoft` mapeado, cuya carpeta física local es `C:\contasoft`. Por eso el contenedor monta directamente la ruta local (sin scripts ni tareas programadas).
+
+**Verificar la ruta física del share** (en la `SERVER`):
+
+```powershell
+net share contasoft
+# Ruta de acceso: C:\contasoft
+```
+
+**Requisitos en `docker-compose.yml`** (ya configurado):
+
+```yaml
+environment:
+  - NISIRA_EXPORT_DIR=/app/nisira-export          # ruta que ve el contenedor
+volumes:
+  - C:/contasoft/FACTURACION_EDOC_CODINSA/DBFCODINSA:/app/nisira-export   # folder local del share
+```
+
+**Antes de `docker compose up -d`:**
+1. Crear la subcarpeta `C:\contasoft\FACTURACION_EDOC_CODINSA\DBFCODINSA` si no existe (con el usuario con permiso sobre el share).
+2. Confirmar que en las demás PCs la `X:` apunte a `\\SERVER\contasoft`.
+
+**Pasos de verificación del módulo:**
+1. Abrir `Configuración > Nisira Export Direct`.
+2. En "2 · Exportar directo a ruta", la ruta destino debe mostrar `/app/nisira-export` (es el punto de montaje en Docker).
+3. Ejecutar "Exportar directo a ruta". El `.dbf` debe aparecer en `C:\contasoft\FACTURACION_EDOC_CODINSA\DBFCODINSA` y en `X:\FACTURACION_EDOC_CODINSA\DBFCODINSA\` desde cualquier PC con el share mapeado.
+
+> La ruta destino también se puede editar desde la UI (se guarda en `config/nisira-config.json`). El módulo **Nisira Export** (descarga por navegador) sigue funcionando de forma independiente para otras PCs/OS.
+
 ---
 
 ## 6. Seguridad

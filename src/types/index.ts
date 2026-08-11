@@ -252,4 +252,4 @@ export interface BackupConfig {
   lastBackupStatus: 'success' | 'failed' | null;
 }
 
-export type { TablaNisira, NisiraExportResponse } from './nisira';
+export type { TablaNisira, NisiraExportResponse, NisiraDirectConfig } from './nisira';

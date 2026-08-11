@@ -148,30 +148,60 @@ export async function runNisiraSp(dia: number, mes: number, anio: number): Promi
   return { count };
 }
 
-export async function exportNisiraToDbf(): Promise<{ tempPath: string; count: number; filename: string }> {
-  const pool = await getDbPool();
-  const result = await pool.request()
-    .query('SELECT * FROM [dbo].[tablaNisira]');
-
-  const records: TablaNisira[] = result.recordset;
-  const count = records.length;
-
-  const now = new Date();
-  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-  const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
-  const filename = `NisiraExport_${dateStr}_${timeStr}.dbf`;
-  const tempPath = path.join(os.tmpdir(), filename);
-
-  if (fs.existsSync(tempPath)) {
-    fs.unlinkSync(tempPath);
+export async function buildNisiraDbf(records: TablaNisira[], targetPath: string): Promise<void> {
+  if (fs.existsSync(targetPath)) {
+    fs.unlinkSync(targetPath);
   }
 
-  const dbf = await DBFFile.create(tempPath, fieldDescriptors, { fileVersion: 0x03 });
+  const dbf = await DBFFile.create(targetPath, fieldDescriptors, { fileVersion: 0x03 });
 
-  if (count > 0) {
+  if (records.length > 0) {
     const mapped = records.map(mapRecord);
     await dbf.appendRecords(mapped);
   }
+}
+
+function generateFilename(now: Date = new Date()): string {
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
+  return `NisiraExport_${dateStr}_${timeStr}.dbf`;
+}
+
+export async function getNisiraRecords(): Promise<TablaNisira[]> {
+  const pool = await getDbPool();
+  const result = await pool.request()
+    .query('SELECT * FROM [dbo].[tablaNisira]');
+  return result.recordset;
+}
+
+export async function exportNisiraToDbf(): Promise<{ tempPath: string; count: number; filename: string }> {
+  const records = await getNisiraRecords();
+  const count = records.length;
+
+  const filename = generateFilename();
+  const tempPath = path.join(os.tmpdir(), filename);
+
+  await buildNisiraDbf(records, tempPath);
 
   return { tempPath, count, filename };
+}
+
+export async function exportNisiraToDbfDirect(destDir: string): Promise<{ filePath: string; count: number; filename: string }> {
+  if (!destDir || !destDir.trim()) {
+    throw new Error('La ruta destino no está configurada.');
+  }
+
+  if (!fs.existsSync(destDir)) {
+    throw new Error(`La ruta destino no existe o no es accesible desde el servidor: ${destDir}`);
+  }
+
+  const records = await getNisiraRecords();
+  const count = records.length;
+
+  const filename = generateFilename();
+  const filePath = path.join(destDir, filename);
+
+  await buildNisiraDbf(records, filePath);
+
+  return { filePath, count, filename };
 }

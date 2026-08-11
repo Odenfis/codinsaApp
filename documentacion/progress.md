@@ -339,5 +339,51 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
 - **Compatibilidad:** La exportación (`GET /api/nisira/export`) no fue modificada; si se usa sin generar, exporta el contenido actual de la tabla.
 - **Sin dependencias nuevas:** El SP no se modifica; solo se invoca con parámetros tipados.
 
+## 17. Nisira Export Direct (Nuevo)
+- **Objetivo:** Exportar la tabla `[dbo].[tablaNisira]` a un archivo **.dbf** directamente en la **carpeta compartida de red** del cliente (`X:\FACTURACION_EDOC_CODINSA\DBFCODINSA\`, share `contasoft`), sin descargar por el navegador. Esto permite que el otro sistema/operador lea el archivo desde esa carpeta. Se mantiene el **Nisira Export** genérico (descarga) intacto para uso en otras PCs/OS.
+- **Sidebar:**
+  - Nuevo submenú **"Nisira Export Direct"** (`icono: FolderOutput`) bajo Configuración, con ruta `/settings/nisira-export-direct`.
+  - Icono `FolderOutput` registrado en el resolver dinámico del `Sidebar.tsx`.
+  - Módulo `id_modulo: 14` agregado a `rolesModulos` para Enterprise Admin.
+- **Nuevo archivo de configuración (`src/backend/nisiraConfig.ts`):**
+  - Clase `NisiraExportConfigManager` que persiste la configuración en `config/nisira-config.json` (mismo patrón que `BackupConfigManager`).
+  - Campo `destinationPath` con default `X:\FACTURACION_EDOC_CODINSA\DBFCODINSA\`.
+  - **Precedencia de la ruta:** variable de entorno `NISIRA_EXPORT_DIR` (para Docker, que ve el punto de montaje `/app/nisira-export`) sobre el config file (para Windows nativo).
+  - Registro del último export (`lastExport`, `lastExportCount`, `lastExportStatus`).
+- **Refactor del Service (`NisiraExportService.ts`):**
+  - Extracción de la generación del .dbf a la función reutilizable `buildNisiraDbf(records, targetPath)`.
+  - Nueva función `getNisiraRecords()` (consulta única de `SELECT *`).
+  - Nueva función `exportNisiraToDbfDirect(destDir)`:
+    - Valida que la ruta destino exista; si no → error claro *"La ruta destino no existe o no es accesible desde el servidor"*.
+    - Genera el archivo `NisiraExport_YYYYMMDD_HHMMSS.dbf` directamente en la ruta.
+    - Retorna `{ filePath, count, filename }`.
+- **Nuevos Endpoints Backend:**
+  - `GET /api/nisira/direct-config` — Obtiene la configuración actual (con override de env).
+  - `PUT /api/nisira/direct-config` — Guarda `destinationPath` (validación no vacío) y registra en auditoría.
+  - `POST /api/nisira/export-direct` — Ejecuta `exportNisiraToDbfDirect` con la ruta configurada, registra el último export y audita con la ruta y cantidad.
+  - Todos protegidos con `authMiddleware`.
+- **Nuevo Componente Frontend (`NisiraExportDirectView.tsx`):**
+  - Mismo flujo de 2 pasos que Nisira Export: tarjeta **"1 · Generar tabla Nisira (Ejecutar SP)"** (Día/Mes/Año) y tarjeta **"2 · Exportar directo a ruta"**.
+  - **Input editable de ruta destino** (cargado desde la config) con botón **Guardar** (`PUT /api/nisira/direct-config`).
+  - Botón **"Exportar directo a ruta"** → modal de confirmación mostrando la ruta destino y el conteo → `POST /api/nisira/export-direct`.
+  - Feedback de éxito con la ruta completa y cantidad; panel informativo del formato y la ruta destino.
+- **Despliegue Docker (`docker-compose.yml`):**
+  - Nueva variable `NISIRA_EXPORT_DIR=/app/nisira-export`.
+  - **Topología confirmada con el cliente:** la app corre en la misma `SERVER` que comparte `contasoft`. La letra `X:` es el share `contasoft` mapeado, cuya carpeta física local es `C:\contasoft` (obtenido con `net share contasoft`).
+  - Nuevo volumen: `- C:/contasoft/FACTURACION_EDOC_CODINSA/DBFCODINSA:/app/nisira-export` — monta la carpeta local detrás del share, por lo que el `.dbf` queda disponible en `X:\FACTURACION_EDOC_CODINSA\DBFCODINSA\` desde cualquier PC con el share mapeado.
+  - **Sin scripts ni tareas programadas:** al montar el folder local físico directamente, Windows expone los archivos al share de red automáticamente.
+  - Requisito previo: crear `C:\contasoft\FACTURACION_EDOC_CODINSA\DBFCODINSA` antes del `docker compose up -d`.
+- **Archivos modificados:**
+  - `src/backend/services/NisiraExportService.ts` — Refactor + `exportNisiraToDbfDirect`.
+  - `src/backend/nisiraConfig.ts` — Nuevo config manager.
+  - `src/types/nisira.ts` — Nueva interfaz `NisiraDirectConfig`.
+  - `src/types/index.ts` — Re-export de `NisiraDirectConfig`.
+  - `server.ts` — 3 endpoints nuevos (~75 líneas).
+  - `src/backend/db/database.ts` — Módulo `id_modulo: 14` + `rolesModulos[1]`.
+  - `src/components/layout/Sidebar.tsx` — Import + case para `FolderOutput`.
+  - `src/App.tsx` — Import + ruta `'/settings/nisira-export-direct'`.
+  - `docker-compose.yml` — Env + volumen de montaje.
+- **Sin dependencias nuevas:** Reutiliza `dbffile`, `authMiddleware` y el patrón de config existente.
+
 ---
-*Última actualización: 08 de Agosto, 2026*
+*Última actualización: 11 de Agosto, 2026*

@@ -18,7 +18,8 @@ import { ClientRepository, ProviderRepository, UserRepository, ReportRepository,
 import { db } from './src/backend/db/database';
 import { BackupConfigManager } from './src/backend/backupConfig';
 import { BackupScheduler } from './src/backend/backup/backupScheduler';
-import { getNisiraCount, exportNisiraToDbf, runNisiraSp } from './src/backend/services/NisiraExportService';
+import { getNisiraCount, exportNisiraToDbf, runNisiraSp, exportNisiraToDbfDirect } from './src/backend/services/NisiraExportService';
+import { NisiraExportConfigManager } from './src/backend/nisiraConfig';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -45,6 +46,7 @@ const reportRepo = new ReportRepository();
 const auditRepo = new AuditRepository();
 const backupConfigManager = new BackupConfigManager();
 const backupScheduler = new BackupScheduler(backupConfigManager);
+const nisiraConfigManager = new NisiraExportConfigManager();
 
 // Logging Middleware
 app.use((req, res, next) => {
@@ -798,6 +800,66 @@ app.get('/api/nisira/export', authMiddleware, async (req: AuthenticatedRequest, 
     if (!res.headersSent) {
       return res.status(500).json({ error: 'Error al exportar: ' + err.message });
     }
+  }
+});
+
+// ==============================================================================
+// 3g. ENDPOINTS NISIRA EXPORT DIRECT (DBF a ruta fija del servidor)
+// ==============================================================================
+
+app.get('/api/nisira/direct-config', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const config = nisiraConfigManager.getConfig();
+    return res.json({ success: true, config });
+  } catch (err: any) {
+    console.error('[NISIRA DIRECT CONFIG GET ERROR]', err);
+    return res.status(500).json({ error: 'Error al obtener la configuración: ' + err.message });
+  }
+});
+
+app.put('/api/nisira/direct-config', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const destinationPath = String(req.body?.destinationPath || '').trim();
+
+    if (!destinationPath) {
+      return res.status(400).json({ error: 'La ruta destino no puede estar vacía.' });
+    }
+
+    const config = nisiraConfigManager.updateDestinationPath(destinationPath);
+
+    db.addAuditLog(
+      req.user?.nombres + ' ' + req.user?.apellidos,
+      'Nisira Export Direct',
+      `Configuró la ruta destino de exportación: ${destinationPath}`,
+      req.ip
+    );
+
+    return res.json({ success: true, config });
+  } catch (err: any) {
+    console.error('[NISIRA DIRECT CONFIG SAVE ERROR]', err);
+    return res.status(500).json({ error: 'Error al guardar la configuración: ' + err.message });
+  }
+});
+
+app.post('/api/nisira/export-direct', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const destinationPath = nisiraConfigManager.getDestinationPath();
+    const { filePath, count, filename } = await exportNisiraToDbfDirect(destinationPath);
+
+    nisiraConfigManager.setLastExport('success', count);
+
+    db.addAuditLog(
+      req.user?.nombres + ' ' + req.user?.apellidos,
+      'Nisira Export Direct',
+      `Exportó tabla Nisira a ${filePath} - ${count} registros`,
+      req.ip
+    );
+
+    return res.json({ success: true, path: filePath, filename, count });
+  } catch (err: any) {
+    console.error('[NISIRA EXPORT DIRECT ERROR]', err);
+    nisiraConfigManager.setLastExport('failed');
+    return res.status(500).json({ error: 'Error al exportar directamente: ' + err.message });
   }
 });
 

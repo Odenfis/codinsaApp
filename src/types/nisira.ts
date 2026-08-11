@@ -92,3 +92,10 @@ export interface NisiraExportResponse {
   count: number;
   message: string;
 }
+
+export interface NisiraDirectConfig {
+  destinationPath: string;
+  lastExport: string | null;
+  lastExportCount: number | null;
+  lastExportStatus: 'success' | 'failed' | null;
+}

@@ -18,6 +18,7 @@ import {
   PenLine,
   HardDrive,
   FileDown,
+  FolderOutput,
   ChevronDown
 } from 'lucide-react';
 
@@ -54,6 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModu
       case 'PenLine': return <PenLine className={className} />;
       case 'HardDrive': return <HardDrive className={className} />;
       case 'FileDown': return <FileDown className={className} />;
+      case 'FolderOutput': return <FolderOutput className={className} />;
       default: return <FolderTree className={className} />;
     }
   };
