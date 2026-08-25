@@ -20,6 +20,7 @@ import { BackupConfigManager } from './src/backend/backupConfig';
 import { BackupScheduler } from './src/backend/backup/backupScheduler';
 import { getNisiraCount, exportNisiraToDbf, runNisiraSp, exportNisiraToDbfDirect } from './src/backend/services/NisiraExportService';
 import { NisiraExportConfigManager } from './src/backend/nisiraConfig';
+import { ErpUpdateConfigManager } from './src/backend/erpUpdateConfig';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -47,6 +48,7 @@ const auditRepo = new AuditRepository();
 const backupConfigManager = new BackupConfigManager();
 const backupScheduler = new BackupScheduler(backupConfigManager);
 const nisiraConfigManager = new NisiraExportConfigManager();
+const erpUpdateConfigManager = new ErpUpdateConfigManager();
 
 // Logging Middleware
 app.use((req, res, next) => {
@@ -860,6 +862,106 @@ app.post('/api/nisira/export-direct', authMiddleware, async (req: AuthenticatedR
     console.error('[NISIRA EXPORT DIRECT ERROR]', err);
     nisiraConfigManager.setLastExport('failed');
     return res.status(500).json({ error: 'Error al exportar directamente: ' + err.message });
+  }
+});
+
+// ==============================================================================
+// 3h. ENDPOINTS DE ACTUALIZACIÓN ERP (instalador .bat desde Google Drive)
+// ==============================================================================
+
+app.get('/api/config/erp-update', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  return res.json({
+    success: true,
+    config: erpUpdateConfigManager.getConfig(),
+    historial: erpUpdateConfigManager.getHistorial()
+  });
+});
+
+app.put('/api/config/erp-update', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  const driveUrl = String(req.body?.driveUrl || '').trim();
+  const sha256Raw = String(req.body?.sha256 || '').trim();
+  const zipNameRaw = String(req.body?.zipName || '').trim();
+  const notaRaw = String(req.body?.nota || '').trim();
+
+  if (!driveUrl) {
+    return res.status(400).json({ error: 'El enlace de Google Drive es requerido.' });
+  }
+
+  // Extraer el ID del enlace: soporta /file/d/ID, ?id=ID y /d/ID
+  const match = driveUrl.match(/\/file\/d\/([A-Za-z0-9_-]{10,})|[?&]id=([A-Za-z0-9_-]{10,})|\/d\/([A-Za-z0-9_-]{10,})/);
+  const driveId = match ? (match[1] || match[2] || match[3]) : '';
+  if (!driveId) {
+    return res.status(400).json({ error: 'No se pudo extraer el ID del archivo desde el enlace. Verifique que sea un enlace compartido de Google Drive.' });
+  }
+
+  let sha256: string | null = null;
+  if (sha256Raw) {
+    if (!/^[a-fA-F0-9]{64}$/.test(sha256Raw)) {
+      return res.status(400).json({ error: 'El SHA256 debe ser un hash hexadecimal de 64 caracteres (o dejarlo vacío para omitir la validación).' });
+    }
+    sha256 = sha256Raw.toLowerCase();
+  }
+
+  let zipName = 'actualizacionERP.zip';
+  if (zipNameRaw) {
+    if (!/^[A-Za-z0-9._-]+\.zip$/i.test(zipNameRaw)) {
+      return res.status(400).json({ error: 'El nombre del ZIP solo admite letras, números, punto, guion y guion bajo, y debe terminar en .zip' });
+    }
+    zipName = zipNameRaw;
+  }
+
+  const config = erpUpdateConfigManager.update({
+    driveId,
+    driveUrl,
+    zipName,
+    sha256,
+    nota: notaRaw || null,
+    actualizadoPor: req.user?.usuario || null
+  });
+
+  db.addAuditLog(
+    req.user?.usuario || 'desconocido',
+    'Actualización ERP',
+    `Configuró actualización ERP: Drive ID ${driveId}, ZIP ${zipName}${sha256 ? ', con SHA256' : ', sin SHA256'}`,
+    req.ip
+  );
+
+  return res.json({ success: true, config, message: 'Configuración guardada correctamente' });
+});
+
+app.get('/api/updates/actualizar-erp', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const config = erpUpdateConfigManager.getConfig();
+    if (!config.driveId) {
+      return res.status(400).json({ error: 'No hay configuración vigente. Configure primero el enlace de Google Drive del ZIP de actualización.' });
+    }
+
+    const templatePath = path.join(process.cwd(), 'updates', 'Actualizar_ERP_Nube.bat');
+    if (!fs.existsSync(templatePath)) {
+      console.error('[ERP UPDATE ERROR] Plantilla no encontrada:', templatePath);
+      return res.status(500).json({ error: 'Plantilla del instalador no encontrada en el servidor.' });
+    }
+
+    const contenido = fs.readFileSync(templatePath, 'utf-8')
+      .replace(/@@DRIVE_ID@@/g, config.driveId)
+      .replace(/@@ZIP_NAME@@/g, config.zipName)
+      .replace(/@@ZIP_SHA256@@/g, config.sha256 || '');
+
+    db.addAuditLog(
+      req.user?.usuario || 'desconocido',
+      'Actualización ERP',
+      `Descargó instalador Actualizar_ERP_Nube.bat (Drive ID ${config.driveId})`,
+      req.ip
+    );
+
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', 'attachment; filename="Actualizar_ERP_Nube.bat"');
+    return res.send(contenido);
+  } catch (err: any) {
+    console.error('[ERP UPDATE DOWNLOAD ERROR]', err);
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Error al generar el instalador: ' + err.message });
+    }
   }
 });
 

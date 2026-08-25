@@ -367,6 +367,7 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
   - **Input editable de ruta destino** (cargado desde la config) con botón **Guardar** (`PUT /api/nisira/direct-config`).
   - Botón **"Exportar directo a ruta"** → modal de confirmación mostrando la ruta destino y el conteo → `POST /api/nisira/export-direct`.
   - Feedback de éxito con la ruta completa y cantidad; panel informativo del formato y la ruta destino.
+  - Textos informativos referenciando la ruta compartida de red **`X:\FACTURACION_EDOC_CODINSA\DBFCODINSA\`** (share `contasoft`) y el montaje en Docker sobre `C:\contasoft\FACTURACION_EDOC_CODINSA\DBFCODINSA`.
 - **Despliegue Docker (`docker-compose.yml`):**
   - Nueva variable `NISIRA_EXPORT_DIR=/app/nisira-export`.
   - **Topología confirmada con el cliente:** la app corre en la misma `SERVER` que comparte `contasoft`. La letra `X:` es el share `contasoft` mapeado, cuya carpeta física local es `C:\contasoft` (obtenido con `net share contasoft`).
@@ -383,7 +384,40 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
   - `src/components/layout/Sidebar.tsx` — Import + case para `FolderOutput`.
   - `src/App.tsx` — Import + ruta `'/settings/nisira-export-direct'`.
   - `docker-compose.yml` — Env + volumen de montaje.
-- **Sin dependencias nuevas:** Reutiliza `dbffile`, `authMiddleware` y el patrón de config existente.
+  - `README-DEPLOY.md` — Sección 5.3 reescrita (topología, verificación con `net share contasoft`, requisitos previos y pasos de prueba).
+- **Despliegue pendiente con el cliente (pasos a realizar en la PC `SERVER`):**
+  1. Crear `C:\contasoft\FACTURACION_EDOC_CODINSA\DBFCODINSA` si no existe.
+  2. `git pull` + ejecutar `update.bat` (o `update.sh`).
+  3. Verificar montaje: `docker compose exec toolkit-app ls /app/nisira-export` debe listar la carpeta.
+  4. En la app → `Configuración > Nisira Export Direct`: ejecutar el SP y "Exportar directo a ruta"; confirmar que el `.dbf` aparece en `X:\FACTURACION_EDOC_CODINSA\DBFCODINSA\`.
+- **Sin dependencias nuevas:** Reutiliza `dbffile`, `authMiddleware` y el patrón de config existente. Sin scripts ni tareas programadas de Windows.
+
+## 18. Módulo Actualización ERP (Nuevo)
+
+**24/08/2026** — Nuevo submódulo "Actualización ERP" dentro de Configuración (configurador + descarga del instalador en una sola vista).
+
+- **Objetivo:** distribuir a los clientes la actualización del Sistema ERP Nube sin intervención técnica manual. El administrador pega el enlace de Google Drive del ZIP (+ SHA256 opcional) y descarga un `.bat` generado dinámicamente que hace todo en la PC del cliente.
+- **Plantilla autocontenida `updates/Actualizar_ERP_Nube.bat` (ASCII + CRLF):**
+  - Auto-elevación admin vía PowerShell (`fltmc` + `Start-Process -Verb RunAs`).
+  - Descarga desde Google Drive con `curl.exe` (fallback `Invoke-WebRequest`, URL pública con `confirm=t`).
+  - Validación SHA256 con `certutil` — **opcional**: si `@@ZIP_SHA256@@` va vacío se omite (queda chequeo de tamaño > 1MB).
+  - Extracción con `tar.exe` (fallback `Expand-Archive`), cierre de procesos `COD_*.exe` (`taskkill`), copia de EXE al Escritorio real del usuario (OneDrive-safe) y DLLs a `C:\Windows\SysWOW64`, registro con `regsvr32.exe /s`.
+  - Archivos de este sistema: `COD_ALMACEN/COD_COMPRAS/COD_CUENTAS/COD_SEGURIDAD/COD_VENTAS.exe` al Escritorio; `CodEstadisticas/CodInstall/CodMaestros/CodProcesos/CodSeguridad.dll` a SysWOW64.
+  - Log en `%TEMP%\codinsa_instalador.log`, resumen OK/ERRORES, limpieza. Requiere Windows 10 (1803+)/11 de 64 bits. Mensajes con guiones en lugar de paréntesis dentro de bloques `if` (evita cierres prematuros de bloques).
+  - Marcadores reemplazados por el servidor en cada descarga: `@@DRIVE_ID@@`, `@@ZIP_NAME@@`, `@@ZIP_SHA256@@`.
+- **Persistencia (JSON, patrón del proyecto):** nuevo `ErpUpdateConfigManager` (`src/backend/erpUpdateConfig.ts`) sobre `config/erp-update-config.json` (volumen Docker ya montado). Guarda config activa + historial (máx. 20). Interfaz `ErpUpdateConfig` en `src/types/index.ts`.
+- **Backend (`server.ts`, sección 3h):**
+  - `GET /api/config/erp-update` — config activa + historial.
+  - `PUT /api/config/erp-update` — extrae el ID del enlace con regex que soporta `/file/d/ID`, `?id=ID` y `/d/ID`; valida ID `[A-Za-z0-9_-]{10,}`, SHA256 hex-64 opcional y nombre ZIP sanitizado (default `actualizacionERP.zip`); guarda + push al historial + auditoría `'Actualización ERP'`.
+  - `GET /api/updates/actualizar-erp` — sustituye marcadores y sirve el .bat como attachment (`Content-Disposition`); 400 si no hay config vigente; audita cada descarga. Todos con `authMiddleware`.
+- **Frontend:**
+  - Módulo `{ id_modulo: 15, 'Actualización ERP', icono 'CloudDownload', ruta '/settings/erp-update', orden 4 }` como child de Configuración; solo en `rolesModulos[1]`.
+  - Nueva vista `ErpUpdateView.tsx`: formulario (enlace Drive, SHA256 opcional, nombre ZIP, nota), tarjeta "Instalador para clientes" con botón de descarga (ancla directa, sesión vía cookie; deshabilitado sin config), tabla de historial e instrucciones para el cliente.
+  - `Sidebar.tsx` (icono) y `App.tsx` (ruta) actualizados.
+- **Dockerfile:** `COPY --from=builder /app/updates ./updates` para que la plantilla exista en la imagen de producción.
+- **Sin migración BD ni dependencias nuevas.**
+- **Pendiente de prueba en PC cliente Windows real** (descarga Drive, validación hash, copias y registro regsvr32).
+- Estado: 🔶
 
 ---
-*Última actualización: 11 de Agosto, 2026*
+*Última actualización: 24 de Agosto, 2026*

@@ -24,6 +24,8 @@ ENV PORT=3000
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
+# Plantilla del instalador de Actualización ERP (servida por /api/updates/actualizar-erp)
+COPY --from=builder /app/updates ./updates
 
 EXPOSE 3000
 

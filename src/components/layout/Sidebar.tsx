@@ -19,6 +19,7 @@ import {
   HardDrive,
   FileDown,
   FolderOutput,
+  CloudDownload,
   ChevronDown
 } from 'lucide-react';
 
@@ -56,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModu
       case 'HardDrive': return <HardDrive className={className} />;
       case 'FileDown': return <FileDown className={className} />;
       case 'FolderOutput': return <FolderOutput className={className} />;
+      case 'CloudDownload': return <CloudDownload className={className} />;
       default: return <FolderTree className={className} />;
     }
   };

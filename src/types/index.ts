@@ -252,4 +252,14 @@ export interface BackupConfig {
   lastBackupStatus: 'success' | 'failed' | null;
 }
 
+export interface ErpUpdateConfig {
+  driveId: string;
+  driveUrl: string;
+  zipName: string;
+  sha256: string | null;
+  nota: string | null;
+  actualizadoPor: string | null;
+  fechaActualizacion: string | null;
+}
+
 export type { TablaNisira, NisiraExportResponse, NisiraDirectConfig } from './nisira';
