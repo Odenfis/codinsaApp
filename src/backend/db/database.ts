@@ -22,9 +22,14 @@ class EnterpriseDatabase {
       { id_modulo: 10, nombre_modulo: 'Listado de Productos', icono: 'List', ruta: '/products', orden: 1, estado: true },
       { id_modulo: 11, nombre_modulo: 'Editar Cod. Laboratorio', icono: 'PenLine', ruta: '/products/edit-lab', orden: 2, estado: true }
     ] },
-    { id_modulo: 3, nombre_modulo: 'Providers', icono: 'Network', ruta: '/providers', orden: 4, estado: false },
-    { id_modulo: 4, nombre_modulo: 'Users', icono: 'UserCheck', ruta: '/users', orden: 5, estado: false },
-    { id_modulo: 5, nombre_modulo: 'Reports', icono: 'BarChart3', ruta: '/reports', orden: 6, estado: false },
+    { id_modulo: 5, nombre_modulo: 'Reportes', icono: 'BarChart3', ruta: '/reports', orden: 4, estado: true, children: [
+      { id_modulo: 16, nombre_modulo: 'Cuentas', icono: 'WalletCards', ruta: '/reports/accounts', orden: 1, estado: true, children: [
+        { id_modulo: 17, nombre_modulo: 'Reporte de Cobranzas', icono: 'ReceiptText', ruta: '/reports/accounts/collections', orden: 1, estado: true },
+        { id_modulo: 18, nombre_modulo: 'Planilla Cobranza', icono: 'ClipboardList', ruta: '/reports/accounts/collection-sheet', orden: 2, estado: true }
+      ] }
+    ] },
+    { id_modulo: 3, nombre_modulo: 'Providers', icono: 'Network', ruta: '/providers', orden: 5, estado: false },
+    { id_modulo: 4, nombre_modulo: 'Users', icono: 'UserCheck', ruta: '/users', orden: 6, estado: false },
     { id_modulo: 6, nombre_modulo: 'Configuración', icono: 'Settings', ruta: '/settings', orden: 7, estado: true, children: [
       { id_modulo: 12, nombre_modulo: 'Backups', icono: 'HardDrive', ruta: '/settings/backups', orden: 1, estado: true },
       { id_modulo: 13, nombre_modulo: 'Nisira Export', icono: 'FileDown', ruta: '/settings/nisira-export', orden: 2, estado: true },
@@ -35,9 +40,9 @@ class EnterpriseDatabase {
   ];
 
   public rolesModulos: Record<number, number[]> = {
-    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], // Enterprise Admin: todo (incluye Actualización ERP)
-    2: [1, 2, 3, 5, 7],                      // Auditor: todo menos users, settings, productos (sólo lectura)
-    3: [1, 2, 3, 5, 9, 10, 11]               // Gestor operativo: incluye productos
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+    2: [1, 2, 3, 5, 7, 16, 17, 18],
+    3: [1, 2, 3, 5, 9, 10, 11, 16, 17, 18]
   };
 
   public usuarios: Usuario[] = [

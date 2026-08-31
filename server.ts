@@ -338,6 +338,188 @@ app.delete('/api/reports/:id', authMiddleware, (req: AuthenticatedRequest, res: 
   return res.json({ success: true });
 });
 
+const cobranzaMoneyFields = [
+  'Importe', 'pAnterior', 'NotaCred', 'Descuento', 'efectivo', 'deposito',
+  'letra', 'Transferencia', 'cheque', 'Total', 'saldo'
+] as const;
+
+app.get('/api/reportes/cobranzas', authMiddleware, async (req: Request, res: Response) => {
+  const desde = typeof req.query.desde === 'string' ? req.query.desde : '';
+  const hasta = typeof req.query.hasta === 'string' ? req.query.hasta : '';
+  const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+
+  if (!isoDate.test(desde) || !isoDate.test(hasta)) {
+    return res.status(400).json({ error: 'Las fechas desde y hasta son obligatorias y deben usar el formato YYYY-MM-DD.' });
+  }
+
+  const fromDate = new Date(`${desde}T00:00:00`);
+  const toDate = new Date(`${hasta}T23:59:00`);
+  const isExactDate = (value: string, date: Date) => {
+    const [year, month, day] = value.split('-').map(Number);
+    return !Number.isNaN(date.getTime()) && date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+  };
+
+  if (!isExactDate(desde, fromDate) || !isExactDate(hasta, toDate)) {
+    return res.status(400).json({ error: 'El rango contiene una fecha inválida.' });
+  }
+  if (fromDate > toDate) {
+    return res.status(400).json({ error: 'La fecha Del no puede ser posterior a la fecha Al.' });
+  }
+
+  try {
+    const pool = await getDbPool();
+    const toDmy = (value: string) => {
+      const [year, month, day] = value.split('-');
+      return `${day}/${month}/${year}`;
+    };
+    const result = await pool.request()
+      .input('fec1', sql.VarChar(10), toDmy(desde))
+      .input('fec2', sql.VarChar(10), toDmy(hasta))
+      .query(`
+        SET DATEFORMAT dmy;
+        EXEC [dbo].[sp_Cobranzas_reporte] @fec1 = @fec1, @fec2 = @fec2;
+      `);
+
+    const data = result.recordset.map((record: Record<string, unknown>) => {
+      const normalized = { ...record } as Record<string, unknown>;
+      for (const field of cobranzaMoneyFields) {
+        const numericValue = Number(record[field] ?? 0);
+        normalized[field] = Number.isFinite(numericValue) ? numericValue : 0;
+      }
+      return normalized;
+    });
+
+    const totals = Object.fromEntries(cobranzaMoneyFields.map(field => [
+      field,
+      data.reduce((sum: number, row: Record<string, unknown>) => sum + Number(row[field] || 0), 0)
+    ]));
+
+    return res.json({ data, total: data.length, totals });
+  } catch (err) {
+    console.error('[REPORTE COBRANZAS ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el reporte de cobranzas. Inténtelo nuevamente.' });
+  }
+});
+
+const validPlanillaValue = (value: unknown, maxLength: number) =>
+  typeof value === 'string' && value.trim().length > 0 && value.trim().length <= maxLength;
+
+app.get('/api/reportes/planillas-cobranza/series', authMiddleware, async (_req: Request, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request().query(`
+      SELECT DISTINCT RTRIM(Serie) AS Serie
+      FROM PlanC_cobranza
+      ORDER BY Serie
+    `);
+    return res.json({ data: result.recordset });
+  } catch (err) {
+    console.error('[PLANILLA COBRANZA SERIES ERROR]', err);
+    return res.status(500).json({ error: 'No se pudieron cargar las series de cobranza.' });
+  }
+});
+
+app.get('/api/reportes/planillas-cobranza/numeros', authMiddleware, async (req: Request, res: Response) => {
+  const serie = typeof req.query.serie === 'string' ? req.query.serie.trim() : '';
+  if (!validPlanillaValue(serie, 4)) {
+    return res.status(400).json({ error: 'Seleccione una serie válida.' });
+  }
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request()
+      .input('serie', sql.Char(4), serie)
+      .query(`
+        SELECT RTRIM(pc.Numero) AS Numero, pc.FechaIng, pc.Vendedor,
+               RTRIM(COALESCE(e.Nombre, '')) AS Nombre
+        FROM PlanC_cobranza pc
+        LEFT JOIN Empleados e ON e.Codemp = pc.Vendedor
+        WHERE pc.Serie = @serie
+        ORDER BY pc.FechaIng DESC, pc.Numero DESC
+      `);
+    return res.json({ data: result.recordset });
+  } catch (err) {
+    console.error('[PLANILLA COBRANZA NUMEROS ERROR]', err);
+    return res.status(500).json({ error: 'No se pudieron cargar las planillas de la serie.' });
+  }
+});
+
+app.get('/api/reportes/planilla-cobranza', authMiddleware, async (req: Request, res: Response) => {
+  const serie = typeof req.query.serie === 'string' ? req.query.serie.trim() : '';
+  const numero = typeof req.query.numero === 'string' ? req.query.numero.trim() : '';
+  if (!validPlanillaValue(serie, 4) || !validPlanillaValue(numero, 8)) {
+    return res.status(400).json({ error: 'Seleccione una Serie y un Número válidos.' });
+  }
+
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request()
+      .input('serie', sql.Char(4), serie)
+      .input('numero', sql.Char(8), numero)
+      .execute('sp_Planilla_cobranza');
+
+    if (!result.recordset.length) {
+      return res.status(404).json({ error: 'La planilla seleccionada no existe o no contiene documentos.' });
+    }
+
+    const field = (row: Record<string, unknown>, name: string) => {
+      const key = Object.keys(row).find(candidate => candidate.toLowerCase() === name.toLowerCase());
+      return key ? row[key] : undefined;
+    };
+    const textValue = (value: unknown) => value == null ? '' : String(value).trim();
+    const moneyValue = (value: unknown) => {
+      const parsed = Number(value ?? 0);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const first = result.recordset[0] as Record<string, unknown>;
+    const header = {
+      Serie: textValue(field(first, 'Serie')),
+      Numero: textValue(field(first, 'Numero')),
+      Vendedor: Number(field(first, 'Vendedor') ?? 0),
+      Nombre: textValue(field(first, 'Nombre')),
+      FechaCrea: field(first, 'FechaCrea'),
+      FechaIng: field(first, 'FechaIng'),
+      FormaPago: textValue(field(first, 'FormaPago'))
+    };
+
+    const items = result.recordset.map((raw: Record<string, unknown>) => {
+      const Descuento = moneyValue(field(raw, 'Descuento'));
+      const Efectivo = moneyValue(field(raw, 'Efectivo'));
+      const Deposito = moneyValue(field(raw, 'Deposito'));
+      const Letra = moneyValue(field(raw, 'Letra'));
+      const Transferencia = moneyValue(field(raw, 'Transferencia'));
+      const Cheque = moneyValue(field(raw, 'Cheque'));
+      return {
+        CodClie: Number(field(raw, 'CodClie') ?? 0),
+        Razon: textValue(field(raw, 'Razon')),
+        Documento: textValue(field(raw, 'documento')),
+        TipoDoc: Number(field(raw, 'tipodoc') ?? 0),
+        FechaFac: field(raw, 'fechaFac'),
+        Valor: moneyValue(field(raw, 'Valor')),
+        NotaCred: textValue(field(raw, 'NotaCred')),
+        Descuento, Efectivo, Deposito, Letra,
+        NroLetra: textValue(field(raw, 'NroLetra')),
+        Transferencia, Cheque,
+        NroCheque: textValue(field(raw, 'NroCheque')),
+        CtaBanco: textValue(field(raw, 'CtaBanco')),
+        NroOperacion: textValue(field(raw, 'NroOperacion')),
+        DescuentoEfectivo: Descuento + Efectivo,
+        Total: moneyValue(field(raw, 'Total')),
+        TotalGeneral: Descuento + Efectivo + Deposito + Letra + Transferencia + Cheque
+      };
+    });
+
+    const totalFields = ['Valor', 'Descuento', 'Efectivo', 'Deposito', 'Letra', 'Transferencia', 'Cheque', 'Total', 'TotalGeneral'] as const;
+    const totals = Object.fromEntries(totalFields.map(key => [
+      key, items.reduce((sum, item) => sum + item[key], 0)
+    ]));
+
+    return res.json({ header, items, totals });
+  } catch (err) {
+    console.error('[PLANILLA COBRANZA ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar la planilla de cobranza. Inténtelo nuevamente.' });
+  }
+});
+
 // AUDITORÍA
 app.get('/api/audit', authMiddleware, (req: Request, res: Response) => {
   return res.json({ data: auditRepo.getAll() });

@@ -191,6 +191,99 @@ export interface Laboratorio {
   Descripcion: string;
 }
 
+export interface CobranzaReporteRow {
+  Documento: string;
+  Razon: string;
+  Importe: number;
+  pAnterior: number;
+  Planilla: string;
+  FechaIng: string;
+  Vendedor: string;
+  NotaCred: number;
+  Descuento: number;
+  efectivo: number;
+  deposito: number;
+  letra: number;
+  Transferencia: number;
+  cheque: number;
+  NroOperacion: string | number | null;
+  Total: number;
+  saldo: number;
+}
+
+export type CobranzaReporteTotals = Pick<CobranzaReporteRow,
+  'Importe' | 'pAnterior' | 'NotaCred' | 'Descuento' | 'efectivo' |
+  'deposito' | 'letra' | 'Transferencia' | 'cheque' | 'Total' | 'saldo'
+>;
+
+export interface CobranzaReporteResponse {
+  data: CobranzaReporteRow[];
+  total: number;
+  totals: CobranzaReporteTotals;
+}
+
+export interface PlanillaCobranzaSerie {
+  Serie: string;
+}
+
+export interface PlanillaCobranzaNumero {
+  Numero: string;
+  FechaIng: string;
+  Vendedor: number;
+  Nombre: string;
+}
+
+export interface PlanillaCobranzaHeader {
+  Serie: string;
+  Numero: string;
+  Vendedor: number;
+  Nombre: string;
+  FechaCrea: string;
+  FechaIng: string;
+  FormaPago: string;
+}
+
+export interface PlanillaCobranzaItem {
+  CodClie: number;
+  Razon: string;
+  Documento: string;
+  TipoDoc: number;
+  FechaFac: string;
+  Valor: number;
+  NotaCred: string;
+  Descuento: number;
+  Efectivo: number;
+  Deposito: number;
+  Letra: number;
+  NroLetra: string;
+  Transferencia: number;
+  Cheque: number;
+  NroCheque: string;
+  CtaBanco: string;
+  NroOperacion: string;
+  DescuentoEfectivo: number;
+  Total: number;
+  TotalGeneral: number;
+}
+
+export interface PlanillaCobranzaTotals {
+  Valor: number;
+  Descuento: number;
+  Efectivo: number;
+  Deposito: number;
+  Letra: number;
+  Transferencia: number;
+  Cheque: number;
+  Total: number;
+  TotalGeneral: number;
+}
+
+export interface PlanillaCobranzaResponse {
+  header: PlanillaCobranzaHeader;
+  items: PlanillaCobranzaItem[];
+  totals: PlanillaCobranzaTotals;
+}
+
 export interface ApiRucResponse {
   success: boolean;
   datos: {

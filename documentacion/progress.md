@@ -419,5 +419,63 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
 - **Pendiente de prueba en PC cliente Windows real** (descarga Drive, validación hash, copias y registro regsvr32).
 - Estado: 🔶
 
+## 19. Reportes / Cuentas / Reporte de Cobranzas
+
+**30/08/2026** — Nuevo reporte operativo basado en `sp_Cobranzas_reporte`.
+
+- **Navegación y permisos:**
+  - Se reactivó y renombró el módulo oculto `Reports` como **Reportes**, ubicado inmediatamente debajo de Productos.
+  - Se implementó navegación recursiva de tres niveles: **Reportes → Cuentas → Reporte de Cobranzas**.
+  - Nueva ruta `/reports/accounts/collections`, disponible para Administrador, Auditor Senior y Gestor Operativo mediante los módulos `16` y `17`.
+  - El sidebar también fue corregido para funcionar dentro del menú móvil.
+- **Backend y procedimiento almacenado:**
+  - Nuevo endpoint protegido `GET /api/reportes/cobranzas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD`.
+  - Valida fechas obligatorias, fechas calendario reales y que `desde` no sea posterior a `hasta`.
+  - Ejecuta exclusivamente `[dbo].[sp_Cobranzas_reporte]` con parámetros SQL, sin modificar ni reproducir la consulta del SP.
+  - La ejecución usa `SET DATEFORMAT dmy` y transforma las fechas a `dd/MM/yyyy`, tal como requiere el procedimiento existente.
+  - Normaliza importes nulos y devuelve registros, cantidad total y sumatorias de Importe, Pago anterior, Nota de crédito, Descuento, Efectivo, Depósito, Letra, Transferencia, Cheque, Total y Saldo.
+  - `NroOperacion` permanece como identificador y el campo `Total` se respeta exactamente como lo devuelve el SP.
+- **Interfaz (`CollectionsReportView`):**
+  - Rango inicial desde el primer día del mes actual hasta hoy; la consulta solo se ejecuta al pulsar **Generar reporte**.
+  - Estados diferenciados de carga, error, rango inválido y consulta sin resultados.
+  - Resumen con registros encontrados y total general cobrado en formato `es-PE` / PEN.
+  - Tabla con las 17 columnas del procedimiento y paginación de 20 registros; las exportaciones siempre utilizan todos los resultados.
+  - Botones Excel/PDF deshabilitados hasta disponer de información válida.
+- **Exportaciones profesionales:**
+  - XLSX con hoja **Reporte de Cobranzas**, datos numéricos y fechas tipados, autofiltro, fila superior congelada, anchos configurados y fila final de totales.
+  - PDF A3 horizontal con encabezados repetidos, filas alternadas y tabla compacta para todas las columnas.
+  - Cada página PDF muestra `COMPAÑIA DISTRIBUIDORA AMERICANA S.A.C.`, rango, fecha/hora y numeración `Página X de Y`; la última fila contiene los totales monetarios.
+  - Archivos nombrados `Reporte_Cobranzas_DESDE_al_HASTA.xlsx|pdf`.
+- **Corrección visual responsive:**
+  - Se añadieron límites `min-w-0` / `max-w-full` al layout y al reporte para impedir que la tabla ensanche y recorte toda la página.
+  - La tabla dispone de scroll horizontal propio, visible y táctil, con indicador de desplazamiento.
+  - **Documento** y **Razón social** permanecen fijos mientras se recorren las columnas monetarias.
+  - Filtros, rango consultado, tarjetas y paginación se reorganizan sin perder el borde derecho en escritorio, tablet o móvil.
+- **Tipos y archivos principales:**
+  - Nuevos tipos `CobranzaReporteRow`, `CobranzaReporteTotals` y `CobranzaReporteResponse`.
+  - Componentes y utilidades centrales: `CollectionsReportView.tsx`, `server.ts`, `exportUtils.ts`, `Sidebar.tsx` y `App.tsx`.
+- **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente. El build mantiene únicamente la advertencia informativa preexistente sobre tamaño del bundle.
+- Estado: ✅
+
+## 20. Reportes / Cuentas / Planilla Cobranza
+
+**30/08/2026** — Nuevo documento operativo basado en `sp_Planilla_cobranza`.
+
+- Se agregó **Planilla Cobranza** como segundo reporte de Cuentas, con ruta `/reports/accounts/collection-sheet` y acceso para los tres roles operativos del módulo Reportes.
+- Selectores dependientes de Serie y Número cargados desde `PlanC_cobranza`; los números muestran fecha y vendedor para facilitar su identificación.
+- Nuevos endpoints protegidos:
+  - `GET /api/reportes/planillas-cobranza/series` — series disponibles sin espacios residuales de `CHAR(4)`.
+  - `GET /api/reportes/planillas-cobranza/numeros?serie=...` — números de la serie ordenados por fecha descendente, con vendedor.
+  - `GET /api/reportes/planilla-cobranza?serie=...&numero=...` — genera el documento ejecutando el SP con parámetros `Char(4)` y `Char(8)` sin modificar el procedimiento.
+- La respuesta se normaliza en encabezado, detalle y totales. Los campos `CHAR` se limpian, los importes nulos se convierten en cero y `NotaCred` se conserva como referencia textual.
+- Se conserva el `Total` parcial devuelto por el SP y se agrega `TotalGeneral`, calculado con Descuento + Efectivo + Depósito + Letra + Transferencia + Cheque.
+- Nueva vista tipo documento A4 con membrete, Serie–Número, vendedor, fechas, forma de pago, documentos, referencias, resumen por medios de pago, total general y espacios de firma.
+- PDF A4 vertical multipágina con encabezados repetidos, referencias, numeración, resumen final y firmas.
+- XLSX con hojas **Planilla** y **Detalle**, fechas/importes tipados, autofiltro, fila congelada, anchos de columna y totales.
+- Nuevos tipos `PlanillaCobranzaHeader`, `PlanillaCobranzaItem`, `PlanillaCobranzaTotals`, `PlanillaCobranzaResponse` y tipos para selectores.
+- Archivos principales: `CollectionSheetView.tsx`, `server.ts`, `exportUtils.ts`, `database.ts`, `Sidebar.tsx`, `App.tsx` y `types/index.ts`.
+- **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente. Se conserva únicamente la advertencia informativa preexistente sobre tamaño del bundle.
+- Estado: ✅
+
 ---
-*Última actualización: 24 de Agosto, 2026*
+*Última actualización: 30 de Agosto, 2026*

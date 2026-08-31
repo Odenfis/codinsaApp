@@ -14,6 +14,8 @@ import { ClientsView } from './components/modules/ClientsView';
 import { ProvidersView } from './components/modules/ProvidersView';
 import { UsersView } from './components/modules/UsersView';
 import { ReportsView } from './components/modules/ReportsView';
+import { CollectionsReportView } from './components/modules/CollectionsReportView';
+import { CollectionSheetView } from './components/modules/CollectionSheetView';
 import { SettingsView } from './components/modules/SettingsView';
 import { AuditView } from './components/modules/AuditView';
 import { GestionUbigeoView } from './components/modules/GestionUbigeoView';
@@ -52,6 +54,9 @@ const MainLayout: React.FC = () => {
       case '/providers': return <ProvidersView />;
       case '/users': return <UsersView />;
       case '/reports': return <ReportsView />;
+      case '/reports/accounts': return <CollectionsReportView />;
+      case '/reports/accounts/collections': return <CollectionsReportView />;
+      case '/reports/accounts/collection-sheet': return <CollectionSheetView />;
       case '/settings': return <SettingsView />;
       case '/settings/backups': return <SettingsView />;
       case '/settings/nisira-export': return <NisiraExportView />;
@@ -83,6 +88,7 @@ const MainLayout: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 z-50 md:hidden flex">
           <div className="w-[280px] h-full bg-surface">
             <Sidebar 
+              mobile
               activeModulePath={activeRoute} 
               onSelectModule={(ruta) => {
                 setActiveRoute(ruta);
@@ -95,13 +101,13 @@ const MainLayout: React.FC = () => {
       )}
 
       {/* Contenedor de encabezado y área de trabajo */}
-      <div className="flex-1 md:ml-[280px] flex flex-col min-h-screen">
+      <div className="flex-1 min-w-0 max-w-full md:ml-[280px] flex flex-col min-h-screen">
         <Header 
           onToggleMobileMenu={() => setMobileMenuOpen(true)}
           onOpenSqlModal={() => setIsSqlModalOpen(true)}
         />
 
-        <main className="flex-1 mt-16 p-4 md:p-8 overflow-y-auto">
+        <main className="flex-1 min-w-0 max-w-full mt-16 p-4 md:p-8 overflow-y-auto overflow-x-hidden">
           {renderContent()}
         </main>
       </div>

@@ -58,3 +58,26 @@ body {
   animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
+.report-table-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: var(--color-primary) var(--color-surface-container);
+}
+
+.report-table-scroll::-webkit-scrollbar {
+  height: 12px;
+}
+
+.report-table-scroll::-webkit-scrollbar-track {
+  background: var(--color-surface-container);
+  border-top: 1px solid var(--color-outline-variant);
+}
+
+.report-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-primary);
+  border: 3px solid var(--color-surface-container);
+  border-radius: 999px;
+}
+
+.report-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-container);
+}

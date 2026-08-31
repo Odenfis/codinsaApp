@@ -20,15 +20,19 @@ import {
   FileDown,
   FolderOutput,
   CloudDownload,
+  WalletCards,
+  ReceiptText,
+  ClipboardList,
   ChevronDown
 } from 'lucide-react';
 
 interface SidebarProps {
   activeModulePath: string;
   onSelectModule: (ruta: string) => void;
+  mobile?: boolean;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModule }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModule, mobile = false }) => {
   const { user, menu, logout } = useAuth();
   const [expandedMenus, setExpandedMenus] = useState<Set<number>>(new Set());
 
@@ -58,23 +62,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModu
       case 'FileDown': return <FileDown className={className} />;
       case 'FolderOutput': return <FolderOutput className={className} />;
       case 'CloudDownload': return <CloudDownload className={className} />;
+      case 'WalletCards': return <WalletCards className={className} />;
+      case 'ReceiptText': return <ReceiptText className={className} />;
+      case 'ClipboardList': return <ClipboardList className={className} />;
       default: return <FolderTree className={className} />;
     }
   };
 
-  const isParentActive = (mod: Modulo) => {
+  const isParentActive = (mod: Modulo): boolean => {
     if (activeModulePath === mod.ruta) return true;
-    if (mod.children) return mod.children.some(c => activeModulePath === c.ruta);
+    if (mod.children) return mod.children.some(isParentActive);
     return false;
   };
 
-  const renderMenuItem = (mod: Modulo) => {
+  const renderMenuItem = (mod: Modulo, depth: number = 0) => {
     const hasChildren = mod.children && mod.children.length > 0;
     const isExpanded = expandedMenus.has(mod.id_modulo);
     const isActive = isParentActive(mod);
 
     return (
-      <div key={mod.id_modulo}>
+      <div key={mod.id_modulo} className={depth > 0 ? 'mt-0.5' : ''}>
         <button
           onClick={() => {
             if (hasChildren) {
@@ -83,14 +90,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModu
               onSelectModule(mod.ruta);
             }
           }}
-          className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-sm transition-all duration-200 text-left ${
+          className={`w-full flex items-center ${depth ? 'gap-3 py-2' : 'gap-4 py-3'} px-4 rounded-lg text-sm transition-all duration-200 text-left ${
             isActive
               ? 'font-bold text-primary border-r-4 border-primary bg-primary-container/15 shadow-sm'
               : 'font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container-high'
           }`}
         >
           <span className={isActive ? 'text-primary shrink-0' : 'text-outline transition-colors shrink-0'}>
-            {renderIcon(mod.icono)}
+            {renderIcon(mod.icono, depth ? 'w-4 h-4' : 'w-5 h-5')}
           </span>
           <span className="truncate flex-1">{mod.nombre_modulo}</span>
           {hasChildren && (
@@ -105,25 +112,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModu
 
         {hasChildren && isExpanded && (
           <div className="ml-2 mt-1 flex flex-col gap-0.5 border-l-2 border-surface-variant pl-3">
-            {mod.children!.map((child) => {
-              const isChildActive = activeModulePath === child.ruta;
-              return (
-                <button
-                  key={child.id_modulo}
-                  onClick={() => onSelectModule(child.ruta)}
-                  className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-all duration-200 text-left ${
-                    isChildActive
-                      ? 'font-bold text-primary bg-primary-container/15 shadow-sm'
-                      : 'font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container-high'
-                  }`}
-                >
-                  <span className="shrink-0">
-                    {renderIcon(child.icono, 'w-4 h-4')}
-                  </span>
-                  <span className="truncate">{child.nombre_modulo}</span>
-                </button>
-              );
-            })}
+            {mod.children!.filter(child => child.estado).sort((a, b) => a.orden - b.orden).map(child => renderMenuItem(child, depth + 1))}
           </div>
         )}
       </div>
@@ -131,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModu
   };
 
   return (
-    <aside className="hidden md:flex flex-col h-full py-6 bg-surface shadow-sm fixed left-0 top-0 w-[280px] z-20 border-r border-surface-variant select-none">
+    <aside className={`${mobile ? 'flex relative' : 'hidden md:flex fixed left-0 top-0'} flex-col h-full py-6 bg-surface shadow-sm w-[280px] z-20 border-r border-surface-variant select-none`}>
       <div className="px-6 mb-8 flex flex-col gap-2">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-on-primary-container shrink-0 shadow-sm">
