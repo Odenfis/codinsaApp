@@ -513,5 +513,16 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
 - **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente; solo permanece la advertencia informativa preexistente sobre el tamaño del bundle.
 - Estado: ✅
 
+## 24. Separación de Transferencia en Planilla Cobranza
+
+**01/09/2026** — Incorporación explícita de Transferencia en todo el formato operativo.
+
+- Transferencia se separó de Depósito en el modelo compartido y ahora aparece entre Letras y Cheque en pantalla, Excel y PDF.
+- Los totales y el resumen inferior muestran Transferencia de forma independiente, manteniendo Total cobrado como la suma de todos los medios de pago.
+- Depósitos, Transferencias y Cheques disponen de bloques separados con monto, referencia, fecha y banco, sin duplicar importes.
+- Se reajustaron anchos, combinaciones de celdas y flujo multipágina para conservar el formato horizontal, las firmas y las observaciones.
+- **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente.
+- Estado: ✅
+
 ---
-*Última actualización: 31 de Agosto, 2026*
+*Última actualización: 01 de Septiembre, 2026*

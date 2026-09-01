@@ -92,6 +92,7 @@ export const CollectionSheetView: React.FC = () => {
   const presentation = report ? buildCollectionSheetPresentation(report) : null;
   const paymentBlocks = presentation ? [
     { title: 'DEPÓSITOS', rows: presentation.deposits, reference: 'Nº OPERACIÓN' },
+    { title: 'TRANSFERENCIAS', rows: presentation.transfers, reference: 'Nº OPERACIÓN' },
     { title: 'CHEQUE', rows: presentation.checks, reference: 'NÚMERO' }
   ] : [];
 
@@ -173,10 +174,10 @@ export const CollectionSheetView: React.FC = () => {
                   <div className="text-center text-sm font-bold">Nº {report.header.Numero}</div>
                 </div>
                 <table className="w-full table-fixed border-collapse text-[9px] [&_th]:border [&_th]:border-[#637676] [&_th]:p-1 [&_td]:border [&_td]:border-[#637676] [&_td]:px-1 [&_td]:text-center">
-                  <colgroup><col className="w-[5%]"/><col className="w-[9%]"/><col className="w-[17%]"/><col className="w-[11%]"/><col className="w-[4%]"/><col className="w-[7%]"/><col className="w-[7%]"/><col className="w-[8%]"/><col className="w-[7%]"/><col className="w-[6.25%]"/><col className="w-[6.25%]"/><col className="w-[6.25%]"/><col className="w-[6.25%]"/></colgroup>
+                  <colgroup><col className="w-[5%]"/><col className="w-[9%]"/><col className="w-[16%]"/><col className="w-[10%]"/><col className="w-[4%]"/><col className="w-[7%]"/><col className="w-[7%]"/><col className="w-[8%]"/><col className="w-[7%]"/><col className="w-[5.4%]"/><col className="w-[5.4%]"/><col className="w-[5.4%]"/><col className="w-[5.4%]"/><col className="w-[5.4%]"/></colgroup>
                   <thead>
-                    <tr><th rowSpan={2}>Código<br/>Cliente</th><th rowSpan={2}>R.U.C.</th><th rowSpan={2}>Nombre del cliente</th><th rowSpan={2}>Lugar</th><th colSpan={3}>Documento</th><th rowSpan={2}>Importe<br/>Amortizado</th><th rowSpan={2}>Descuento<br/>NC</th><th colSpan={4}>Forma de Pago</th></tr>
-                    <tr><th>Tipo</th><th>Número</th><th>F. Emisión</th><th>Efectivo</th><th>Depósito</th><th>Letras</th><th>Cheque</th></tr>
+                    <tr><th rowSpan={2}>Código<br/>Cliente</th><th rowSpan={2}>R.U.C.</th><th rowSpan={2}>Nombre del cliente</th><th rowSpan={2}>Lugar</th><th colSpan={3}>Documento</th><th rowSpan={2}>Importe<br/>Amortizado</th><th rowSpan={2}>Descuento<br/>NC</th><th colSpan={5}>Forma de Pago</th></tr>
+                    <tr><th>Tipo</th><th>Número</th><th>F. Emisión</th><th>Efectivo</th><th>Depósito</th><th>Letras</th><th>Transferencia</th><th>Cheque</th></tr>
                   </thead>
                   <tbody>{Array.from({ length: 15 }, (_, index) => {
                     const item = pageItems[index];
@@ -185,17 +186,17 @@ export const CollectionSheetView: React.FC = () => {
                       <td>{item ? documentCode(item.TipoDoc) : ''}</td><td>{item?.Documento || ''}</td><td>{item ? dateText(item.FechaFac) : ''}</td>
                       <td className="text-right">{item ? money(item.Valor) : ''}</td><td className="text-right">{item?.Descuento ? money(item.Descuento) : item?.NotaCred || ''}</td>
                       <td className="text-right">{item?.Efectivo ? money(item.Efectivo) : ''}</td><td className="text-right">{item && collectionSheetDeposit(item) ? money(collectionSheetDeposit(item)) : ''}</td>
-                      <td className="text-right">{item?.Letra ? money(item.Letra) : ''}</td><td className="text-right">{item?.Cheque ? money(item.Cheque) : ''}</td>
+                      <td className="text-right">{item?.Letra ? money(item.Letra) : ''}</td><td className="text-right">{item?.Transferencia ? money(item.Transferencia) : ''}</td><td className="text-right">{item?.Cheque ? money(item.Cheque) : ''}</td>
                     </tr>;
                   })}</tbody>
-                  {isLast && <tfoot><tr className="font-bold bg-primary-container/30"><td colSpan={8} className="text-right px-2">TOTALES</td><td className="text-right">{money(presentation.totals.descuento)}</td><td className="text-right">{money(presentation.totals.efectivo)}</td><td className="text-right">{money(presentation.totals.deposito)}</td><td className="text-right">{money(presentation.totals.letra)}</td><td className="text-right">{money(presentation.totals.cheque)}</td></tr></tfoot>}
+                  {isLast && <tfoot><tr className="font-bold bg-primary-container/30"><td colSpan={8} className="text-right px-2">TOTALES</td><td className="text-right">{money(presentation.totals.descuento)}</td><td className="text-right">{money(presentation.totals.efectivo)}</td><td className="text-right">{money(presentation.totals.deposito)}</td><td className="text-right">{money(presentation.totals.letra)}</td><td className="text-right">{money(presentation.totals.transferencia)}</td><td className="text-right">{money(presentation.totals.cheque)}</td></tr></tfoot>}
                 </table>
                 {isLast && <>
                   <div className="grid grid-cols-[1.3fr_1fr] gap-8 mt-3 text-[9px]">
                     <div className="border border-[#637676] p-2"><p className="font-bold text-primary mb-1">CÓDIGOS DE DOCUMENTO PARA SER USADOS EN LA LIQUIDACIÓN DE PLANILLA DE COBRANZA</p><div className="grid grid-cols-3 gap-x-3"><span>1 = FACTURA<br/>2 = LETRA</span><span>3 = NOTA DE DÉBITO<br/>4 = NOTA DE CRÉDITO<br/>5 = PAGO A CUENTA</span><span>6 = CHEQUE DEVUELTO<br/>7 = LETRA PROTESTADA<br/>8 = OTROS</span></div></div>
-                    <div className="grid grid-cols-[1fr_120px] border border-[#637676]"><div className="font-bold bg-primary-container/60 p-2">TOTAL EFECTIVO<br/><br/>TOTAL DEPÓSITO BCO.<br/><br/>TOTAL LETRAS<br/><br/>TOTAL CHEQUE AL DÍA<br/><br/>TOTAL COBRADO</div><div className="text-right p-2 font-mono">{money(presentation.totals.efectivo)}<br/><br/>{money(presentation.totals.deposito)}<br/><br/>{money(presentation.totals.letra)}<br/><br/>{money(presentation.totals.cheque)}<br/><br/><strong>{money(presentation.totals.cobrado)}</strong></div></div>
+                    <div className="grid grid-cols-[1fr_120px] border border-[#637676]"><div className="font-bold bg-primary-container/60 p-2">TOTAL EFECTIVO<br/><br/>TOTAL DEPÓSITO BCO.<br/><br/>TOTAL LETRAS<br/><br/>TOTAL TRANSFERENCIA<br/><br/>TOTAL CHEQUE AL DÍA<br/><br/>TOTAL COBRADO</div><div className="text-right p-2 font-mono">{money(presentation.totals.efectivo)}<br/><br/>{money(presentation.totals.deposito)}<br/><br/>{money(presentation.totals.letra)}<br/><br/>{money(presentation.totals.transferencia)}<br/><br/>{money(presentation.totals.cheque)}<br/><br/><strong>{money(presentation.totals.cobrado)}</strong></div></div>
                   </div>
-                  <div className="grid grid-cols-2 gap-8 mt-3 text-[9px]">
+                  <div className="grid grid-cols-3 gap-4 mt-3 text-[8px]">
                     {paymentBlocks.map(({ title, rows, reference }) => <table key={title} className="w-full border-collapse [&_th]:border [&_th]:border-[#637676] [&_th]:p-1 [&_td]:border [&_td]:border-[#637676] [&_td]:p-1 [&_td]:text-center"><thead><tr><th colSpan={4} className="bg-primary-container/60">{title}</th></tr><tr><th>MONTO</th><th>{reference}</th><th>FECHA</th><th>BANCO</th></tr></thead><tbody>{(rows.length ? rows : [{ amount: 0, reference: '', date: '', bank: '' }]).map((paymentRow, index) => <tr key={index}><td className="text-right">{paymentRow.amount ? money(paymentRow.amount) : ''}</td><td>{paymentRow.reference}</td><td>{paymentRow.date ? dateText(paymentRow.date) : ''}</td><td>{paymentRow.bank}</td></tr>)}</tbody></table>)}
                   </div>
                   <div className="grid grid-cols-3 gap-24 mt-16 px-16 text-[9px] text-center"><div className="border-t border-[#637676] pt-1">VENDEDOR</div><div className="border-t border-[#637676] pt-1">CAJERO</div><div className="border-t border-[#637676] pt-1">VºBº</div></div>
