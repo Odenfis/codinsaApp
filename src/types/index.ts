@@ -244,9 +244,11 @@ export interface PlanillaCobranzaHeader {
 }
 
 export interface PlanillaCobranzaItem {
-  CodClie: number;
+  CodClie: string;
+  RUC: string;
   Razon: string;
   Documento: string;
+  Lugar: string;
   TipoDoc: number;
   FechaFac: string;
   Valor: number;
@@ -260,6 +262,7 @@ export interface PlanillaCobranzaItem {
   Cheque: number;
   NroCheque: string;
   CtaBanco: string;
+  Banco: string;
   NroOperacion: string;
   DescuentoEfectivo: number;
   Total: number;

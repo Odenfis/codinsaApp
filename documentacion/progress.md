@@ -477,5 +477,41 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
 - **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente. Se conserva únicamente la advertencia informativa preexistente sobre tamaño del bundle.
 - Estado: ✅
 
+## 21. Adecuación oficial de Planilla Cobranza
+
+**31/08/2026** — La Planilla Cobranza fue alineada al documento operativo `Formato Planilla.xlsx`.
+
+- La respuesta del SP ahora incorpora `RucCliente`, `Lugar` y `Banco`, preservando códigos e identificadores como texto.
+- Se versionó `sql/sp_Planilla_cobranza.sql` con el procedimiento actualizado y la columna adicional de RUC necesaria para separar cliente y documento cobrado.
+- Se creó un modelo compartido de presentación para pantalla, Excel y PDF: localidad única/`VARIAS`, páginas de 15 documentos, depósitos (incluida transferencia), cheques y totales reconciliados.
+- La vista conserva controles, tarjetas, colores y navegación actuales, pero el documento reproduce logo, cabecera, tabla operativa, leyenda, depósitos, cheques, resumen, firmas y observaciones.
+- El Excel se genera como una única planilla imprimible horizontal, con imagen, celdas combinadas, bordes, fechas/importes tipados, fórmulas de totales y saltos de página.
+- El PDF se genera en A4 horizontal con el mismo orden documental y cabeceras repetidas.
+- Los archivos mantienen el nombre `Planilla_Cobranza_SERIE_NUMERO.xlsx|pdf`.
+- **Validación:** TypeScript, lint, build y `git diff --check` ejecutados correctamente; se mantiene la advertencia informativa de tamaño de bundle.
+- Estado: ✅
+
+## 22. Ajuste de RUC, Lugar y logotipo en Planilla Cobranza
+
+**31/08/2026** — Refinamiento visual y de datos posterior a la validación del formato oficial.
+
+- El procedimiento versionado adopta el alias `c.Documento AS RUC`; la API normaliza `RUC` como texto y conserva compatibilidad temporal con el alias anterior `RucCliente`.
+- Se amplió la columna Lugar en pantalla, Excel y PDF, recuperando espacio de forma proporcional desde Nombre y medios de pago para conservar el ancho A4 horizontal.
+- Lugar incorpora separación interna y tooltip en la vista para evitar colisión visual con Tipo cuando contiene textos como `TRUJILLO, ALREDEDORES`.
+- El logotipo oficial se recorta en memoria usando el canal alfa del PNG, sin modificar `assets/logotipo.png`, y se muestra con un tamaño mayor en los tres formatos.
+- **Validación:** TypeScript, lint, build y `git diff --check` finalizaron correctamente. El bundle de Excel continúa cargándose bajo demanda.
+- Estado: ✅
+
+## 23. Corrección de proporción y flujo del PDF de Planilla Cobranza
+
+**31/08/2026** — Corrección posterior a la revisión visual de los documentos exportados.
+
+- El procesador del logotipo ahora expone sus dimensiones recortadas y relación de aspecto; Excel y PDF calculan el ancho desde una altura objetivo para impedir cualquier deformación.
+- El resumen inferior del PDF se genera como una tabla única, evitando la superposición de etiquetas e importes.
+- Depósitos y cheques se renderizan en una sola tabla coordinada, con columnas simétricas, encabezados repetibles y filas vacías cuando las cantidades difieren.
+- Firmas, observaciones y numeración se posicionan a partir del final real de las tablas; los movimientos extensos pueden continuar en páginas adicionales sin invadir el cierre del documento.
+- **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente; solo permanece la advertencia informativa preexistente sobre el tamaño del bundle.
+- Estado: ✅
+
 ---
-*Última actualización: 30 de Agosto, 2026*
+*Última actualización: 31 de Agosto, 2026*

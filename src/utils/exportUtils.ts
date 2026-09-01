@@ -5,11 +5,17 @@
  */
 
 import * as XLSX from 'xlsx';
+import type ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
   CobranzaReporteRow, CobranzaReporteTotals, PlanillaCobranzaResponse
 } from '../types';
+import {
+  buildCollectionSheetPresentation, collectionSheetDeposit, documentCode
+} from './collectionSheetModel';
+import { loadTrimmedLogoDataUrl } from './logoUtils';
+import logoUrl from '../../assets/logotipo.png';
 
 export function exportToExcel(data: any[], filename: string, sheetName: string = 'Reporte') {
   if (!data || data.length === 0) {
@@ -166,165 +172,246 @@ const safeFilePart = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '_');
 const collectionSheetFilename = (report: PlanillaCobranzaResponse) =>
   `Planilla_Cobranza_${safeFilePart(report.header.Serie)}_${safeFilePart(report.header.Numero)}`;
 
-export function exportCollectionSheetToExcel(report: PlanillaCobranzaResponse) {
-  const { header, items, totals } = report;
-  const summaryRows: any[][] = [
-    ['COMPAÑIA DISTRIBUIDORA AMERICANA S.A.C.'],
-    ['PLANILLA DE COBRANZA'],
-    [],
-    ['Serie', header.Serie, 'Número', header.Numero],
-    ['Vendedor', `${header.Vendedor} - ${header.Nombre}`, 'Forma de pago', header.FormaPago || 'No especificada'],
-    ['Fecha creación', excelDate(header.FechaCrea), 'Fecha ingreso', excelDate(header.FechaIng)],
-    [],
-    ['RESUMEN DE PAGOS', 'IMPORTE'],
-    ['Valor documentos', totals.Valor], ['Descuento', totals.Descuento], ['Efectivo', totals.Efectivo],
-    ['Depósito', totals.Deposito], ['Letra', totals.Letra], ['Transferencia', totals.Transferencia],
-    ['Cheque', totals.Cheque], ['Total original SP', totals.Total], ['TOTAL GENERAL', totals.TotalGeneral]
-  ];
-  const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows, { cellDates: true });
-  summarySheet['!cols'] = [{ wch: 24 }, { wch: 28 }, { wch: 20 }, { wch: 28 }];
-  for (let row = 9; row <= 17; row += 1) {
-    const cell = summarySheet[`B${row}`];
-    if (cell) cell.z = '#,##0.00';
-  }
-
-  const detailHeaders = [
-    'Código cliente', 'Razón social', 'Documento', 'Tipo doc.', 'Fecha factura', 'Valor',
-    'Nota crédito', 'Descuento', 'Efectivo', 'Depósito', 'Letra', 'Nro. letra',
-    'Transferencia', 'Cheque', 'Nro. cheque', 'Cuenta bancaria', 'Nro. operación',
-    'Descuento + Efectivo', 'Total original SP', 'Total general'
-  ];
-  const detailRows = items.map(item => [
-    item.CodClie, item.Razon, item.Documento, item.TipoDoc, excelDate(item.FechaFac), item.Valor,
-    item.NotaCred, item.Descuento, item.Efectivo, item.Deposito, item.Letra, item.NroLetra,
-    item.Transferencia, item.Cheque, item.NroCheque, item.CtaBanco, item.NroOperacion,
-    item.DescuentoEfectivo, item.Total, item.TotalGeneral
-  ]);
-  detailRows.push([
-    '', 'TOTAL', '', '', '', totals.Valor, '', totals.Descuento, totals.Efectivo,
-    totals.Deposito, totals.Letra, '', totals.Transferencia, totals.Cheque, '', '', '',
-    totals.Descuento + totals.Efectivo, totals.Total, totals.TotalGeneral
-  ]);
-  const detailSheet = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailRows], { cellDates: true });
-  detailSheet['!cols'] = [12, 34, 18, 10, 14, 14, 18, 14, 14, 14, 14, 20, 16, 14, 20, 24, 20, 20, 18, 18].map(wch => ({ wch }));
-  detailSheet['!autofilter'] = { ref: `A1:T${items.length + 1}` };
-  detailSheet['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' };
-  for (let row = 2; row <= items.length + 2; row += 1) {
-    [6, 8, 9, 10, 11, 13, 14, 18, 19, 20].forEach(column => {
-      const cell = detailSheet[XLSX.utils.encode_cell({ r: row - 1, c: column - 1 })];
-      if (cell) cell.z = '#,##0.00';
-    });
-  }
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, summarySheet, 'Planilla');
-  XLSX.utils.book_append_sheet(workbook, detailSheet, 'Detalle');
-  XLSX.writeFile(workbook, `${collectionSheetFilename(report)}.xlsx`);
-}
-
-const collectionSheetReferences = (item: PlanillaCobranzaResponse['items'][number]) => {
-  const references = [
-    item.NotaCred && `NC: ${item.NotaCred}`,
-    item.NroOperacion && `Operación: ${item.NroOperacion}`,
-    item.NroLetra && `Letra: ${item.NroLetra}`,
-    item.NroCheque && `Cheque: ${item.NroCheque}`,
-    item.CtaBanco && `Cuenta: ${item.CtaBanco}`
-  ].filter(Boolean);
-  return references.length ? references.join('  ·  ') : 'Sin referencias adicionales';
+const downloadBuffer = (buffer: ExcelJS.Buffer, filename: string) => {
+  const blob = new Blob([buffer as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 };
 
-export function exportCollectionSheetToPdf(report: PlanillaCobranzaResponse) {
-  const { header, items, totals } = report;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const generatedAt = new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date());
-  const body = items.map(item => [
-    `${item.CodClie}\n${item.Razon}`,
-    `${item.Documento} · Tipo ${item.TipoDoc}\n${collectionSheetReferences(item)}`,
-    new Date(item.FechaFac).toLocaleDateString('es-PE'),
-    pdfMoney(item.Valor),
-    pdfMoney(item.TotalGeneral)
-  ]);
+const excelDateValue = (value: string) => {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
 
-  autoTable(doc, {
-    startY: 44,
-    margin: { top: 44, right: 12, bottom: 18, left: 12 },
-    head: [['Cliente', 'Documento y referencias', 'Fecha', 'Valor', 'Aplicado']],
-    body,
-    showHead: 'everyPage',
-    theme: 'grid',
-    headStyles: { fillColor: [0, 103, 103], textColor: 255, fontStyle: 'bold', halign: 'center' },
-    alternateRowStyles: { fillColor: [243, 244, 245] },
-    styles: { fontSize: 7.5, cellPadding: 2, overflow: 'linebreak', valign: 'middle' },
-    columnStyles: {
-      0: { cellWidth: 42 }, 1: { cellWidth: 73 }, 2: { cellWidth: 20, halign: 'center' },
-      3: { cellWidth: 24, halign: 'right' }, 4: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }
+const forEachExcelCell = (
+  sheet: ExcelJS.Worksheet, startRow: number, startColumn: number, endRow: number, endColumn: number,
+  callback: (cell: ExcelJS.Cell, row: number, column: number) => void
+) => {
+  for (let row = startRow; row <= endRow; row += 1) {
+    for (let column = startColumn; column <= endColumn; column += 1) callback(sheet.getCell(row, column), row, column);
+  }
+};
+
+export async function exportCollectionSheetToExcel(report: PlanillaCobranzaResponse) {
+  const presentation = buildCollectionSheetPresentation(report);
+  const { default: ExcelJSRuntime } = await import('exceljs');
+  const workbook = new ExcelJSRuntime.Workbook();
+  workbook.creator = 'CODINSA Tool Kit';
+  const sheet = workbook.addWorksheet('Planilla', {
+    pageSetup: {
+      orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+      margins: { left: 0.2, right: 0.2, top: 0.25, bottom: 0.25, header: 0, footer: 0 }
+    },
+    properties: { defaultRowHeight: 14 },
+    views: [{ showGridLines: false, zoomScale: 70 }]
+  });
+  sheet.columns = [7, 15, 11.5, 11.5, 11.5, 18, 7, 12, 12, 13, 12, 10, 11, 10, 11].map(width => ({ width }));
+  const logo = await loadTrimmedLogoDataUrl(logoUrl);
+  const logoHeight = 90;
+  const logoWidth = logoHeight * logo.aspectRatio;
+  const logoId = workbook.addImage({ base64: logo.dataUrl, extension: 'png' });
+  const thin: Partial<ExcelJS.Borders> = {
+    top: { style: 'thin', color: { argb: 'FF607878' } }, bottom: { style: 'thin', color: { argb: 'FF607878' } },
+    left: { style: 'thin', color: { argb: 'FF607878' } }, right: { style: 'thin', color: { argb: 'FF607878' } }
+  };
+  const teal = 'FF006767';
+  const pale = 'FFDCEEEE';
+  const moneyFormat = '#,##0.00';
+
+  presentation.pages.forEach((items, pageIndex) => {
+    const base = pageIndex * 43;
+    const row = (relative: number) => base + relative;
+    sheet.addImage(logoId, { tl: { col: 0.1, row: base + 0.05 }, ext: { width: logoWidth, height: logoHeight } });
+    sheet.mergeCells(`L${row(2)}:M${row(2)}`); sheet.mergeCells(`N${row(2)}:O${row(2)}`);
+    sheet.mergeCells(`M${row(3)}:O${row(3)}`); sheet.mergeCells(`M${row(4)}:O${row(4)}`);
+    sheet.getCell(`L${row(2)}`).value = 'Fecha de Liquidación:';
+    sheet.getCell(`N${row(2)}`).value = excelDateValue(report.header.FechaIng);
+    sheet.getCell(`L${row(3)}`).value = 'Vendedor:'; sheet.getCell(`M${row(3)}`).value = report.header.Nombre;
+    sheet.getCell(`L${row(4)}`).value = 'Localidad:'; sheet.getCell(`M${row(4)}`).value = presentation.location;
+    sheet.getCell(`N${row(2)}`).numFmt = 'dd/mm/yyyy';
+    sheet.getCell(`L${row(2)}`).font = sheet.getCell(`L${row(3)}`).font = sheet.getCell(`L${row(4)}`).font = { bold: true, size: 9 };
+    for (const targetRow of [row(2), row(3), row(4)]) forEachExcelCell(sheet, targetRow, 12, targetRow, 15, cell => { cell.border = thin; cell.alignment = { vertical: 'middle', horizontal: 'center' }; cell.font = { ...cell.font, size: 9 }; });
+    sheet.mergeCells(`E${row(6)}:M${row(6)}`);
+    sheet.getCell(`E${row(6)}`).value = 'P L A N I L L A   D E   C O B R A N Z A';
+    sheet.getCell(`E${row(6)}`).font = { bold: true, size: 15, color: { argb: teal } };
+    sheet.getCell(`E${row(6)}`).alignment = { horizontal: 'center' };
+    sheet.mergeCells(`N${row(6)}:O${row(6)}`); sheet.getCell(`N${row(6)}`).value = `Nº ${report.header.Numero}`;
+    sheet.getCell(`N${row(6)}`).font = { bold: true, size: 12 }; sheet.getCell(`N${row(6)}`).alignment = { horizontal: 'center' };
+
+    sheet.mergeCells(`A${row(7)}:A${row(8)}`); sheet.mergeCells(`B${row(7)}:B${row(8)}`); sheet.mergeCells(`C${row(7)}:E${row(8)}`);
+    sheet.mergeCells(`F${row(7)}:F${row(8)}`); sheet.mergeCells(`G${row(7)}:I${row(7)}`); sheet.mergeCells(`J${row(7)}:J${row(8)}`);
+    sheet.mergeCells(`K${row(7)}:K${row(8)}`); sheet.mergeCells(`L${row(7)}:O${row(7)}`);
+    [['A', 'Código\nCliente'], ['B', 'R.U.C.'], ['C', 'Nombre del cliente'], ['F', 'Lugar'], ['G', 'Documento'], ['J', 'Importe\nAmortizado'], ['K', 'Descuento\nNC'], ['L', 'Forma de Pago']].forEach(([column, label]) => { sheet.getCell(`${column}${row(7)}`).value = label; });
+    ['Tipo', 'Número', 'F. Emisión', 'Efectivo', 'Depósito', 'Letras', 'Cheque'].forEach((label, index) => { sheet.getCell(row(8), 7 + index).value = label; });
+    forEachExcelCell(sheet, row(7), 1, row(8), 15, cell => {
+      cell.border = thin; cell.font = { bold: true, size: 8, color: { argb: teal } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    });
+
+    for (let index = 0; index < 15; index += 1) {
+      const targetRow = row(9 + index);
+      const item = items[index];
+      sheet.mergeCells(`C${targetRow}:E${targetRow}`);
+      if (item) {
+        [item.CodClie, item.RUC, item.Razon, item.Lugar, documentCode(item.TipoDoc), item.Documento,
+          excelDateValue(item.FechaFac), item.Valor, item.Descuento || item.NotaCred, item.Efectivo,
+          collectionSheetDeposit(item), item.Letra, item.Cheque].forEach((value, indexValue) => {
+            const columns = [1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+            sheet.getCell(targetRow, columns[indexValue]).value = value;
+          });
+        sheet.getCell(targetRow, 9).numFmt = 'dd/mm/yyyy';
+        [10, 11, 12, 13, 14, 15].forEach(column => { if (typeof sheet.getCell(targetRow, column).value === 'number') sheet.getCell(targetRow, column).numFmt = moneyFormat; });
+      }
+      sheet.getRow(targetRow).height = 22;
+      forEachExcelCell(sheet, targetRow, 1, targetRow, 15, (cell, _row, column) => {
+        cell.border = thin; cell.font = { size: 8 }; cell.alignment = { horizontal: column >= 10 ? 'right' : 'center', vertical: 'middle', shrinkToFit: true };
+      });
+    }
+    if (pageIndex < presentation.pages.length - 1) sheet.getRow(row(43)).addPageBreak();
+  });
+
+  const finalBase = (presentation.pages.length - 1) * 43;
+  const finalRow = (relative: number) => finalBase + relative;
+  sheet.mergeCells(`A${finalRow(24)}:J${finalRow(24)}`); sheet.getCell(`A${finalRow(24)}`).value = 'TOTALES';
+  const totalColumns = [11, 12, 13, 14, 15];
+  const totalResults = [presentation.totals.descuento, presentation.totals.efectivo, presentation.totals.deposito, presentation.totals.letra, presentation.totals.cheque];
+  totalColumns.forEach((column, index) => {
+    const ranges = presentation.pages.map((_, pageIndex) => `${String.fromCharCode(64 + column)}${pageIndex * 43 + 9}:${String.fromCharCode(64 + column)}${pageIndex * 43 + 23}`);
+    sheet.getCell(finalRow(24), column).value = { formula: `SUM(${ranges.join(',')})`, result: totalResults[index] };
+    sheet.getCell(finalRow(24), column).numFmt = moneyFormat;
+  });
+  forEachExcelCell(sheet, finalRow(24), 1, finalRow(24), 15, cell => { cell.border = thin; cell.font = { bold: true, size: 8 }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: pale } }; });
+
+  sheet.mergeCells(`A${finalRow(26)}:F${finalRow(28)}`);
+  sheet.getCell(`A${finalRow(26)}`).value = 'CÓDIGOS DE DOCUMENTO PARA SER USADOS EN LA LIQUIDACIÓN DE PLANILLA DE COBRANZA\n1 = FACTURA     2 = LETRA     3 = NOTA DE DÉBITO     4 = NOTA DE CRÉDITO\n5 = PAGO A CUENTA     6 = CHEQUE DEVUELTO     7 = LETRA PROTESTADA     8 = OTROS';
+  sheet.getCell(`A${finalRow(26)}`).alignment = { wrapText: true, vertical: 'middle' }; sheet.getCell(`A${finalRow(26)}`).font = { bold: true, size: 7, color: { argb: teal } };
+  forEachExcelCell(sheet, finalRow(26), 1, finalRow(28), 6, cell => { cell.border = thin; });
+
+  const blockStart = finalRow(30);
+  const paymentRows = Math.max(4, presentation.deposits.length, presentation.checks.length);
+  const renderPaymentBlock = (startColumn: number, title: string, referenceTitle: string, rows: typeof presentation.deposits) => {
+    sheet.mergeCells(blockStart, startColumn, blockStart, startColumn + 3);
+    sheet.getCell(blockStart, startColumn).value = title;
+    sheet.getCell(blockStart, startColumn).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: pale } };
+    ['MONTO', referenceTitle, 'FECHA', 'BANCO'].forEach((label, index) => { sheet.getCell(blockStart + 1, startColumn + index).value = label; });
+    for (let index = 0; index < paymentRows; index += 1) {
+      const payment = rows[index];
+      if (payment) {
+        sheet.getCell(blockStart + 2 + index, startColumn).value = payment.amount;
+        sheet.getCell(blockStart + 2 + index, startColumn).numFmt = moneyFormat;
+        sheet.getCell(blockStart + 2 + index, startColumn + 1).value = payment.reference;
+        sheet.getCell(blockStart + 2 + index, startColumn + 2).value = excelDateValue(payment.date);
+        sheet.getCell(blockStart + 2 + index, startColumn + 2).numFmt = 'dd/mm/yyyy';
+        sheet.getCell(blockStart + 2 + index, startColumn + 3).value = payment.bank;
+      }
+    }
+    forEachExcelCell(sheet, blockStart, startColumn, blockStart + paymentRows + 1, startColumn + 3, cell => { cell.border = thin; cell.font = { bold: Number(cell.row) <= blockStart + 1, size: 7 }; cell.alignment = { horizontal: 'center', vertical: 'middle', shrinkToFit: true }; });
+  };
+  renderPaymentBlock(1, 'DEPÓSITOS', 'Nº OPERACIÓN', presentation.deposits);
+  renderPaymentBlock(7, 'CHEQUE', 'NÚMERO', presentation.checks);
+  const summaryLabels = ['TOTAL EFECTIVO', 'TOTAL DEPÓSITO BCO.', 'TOTAL LETRAS', 'TOTAL CHEQUE AL DÍA', 'TOTAL COBRADO'];
+  const summaryValues = [presentation.totals.efectivo, presentation.totals.deposito, presentation.totals.letra, presentation.totals.cheque, presentation.totals.cobrado];
+  summaryLabels.forEach((label, index) => {
+    const target = blockStart + index;
+    sheet.mergeCells(target, 12, target, 14); sheet.getCell(target, 12).value = label; sheet.getCell(target, 15).value = summaryValues[index];
+    sheet.getCell(target, 15).numFmt = moneyFormat;
+    forEachExcelCell(sheet, target, 12, target, 15, cell => { cell.border = thin; cell.font = { bold: true, size: 7 }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: index === 4 ? pale : 'FF9FD7E2' } }; });
+  });
+  const signatureRow = blockStart + paymentRows + 4;
+  [['D', 'VENDEDOR'], ['H', 'CAJERO'], ['L', 'VºBº']].forEach(([column, label]) => { sheet.getCell(`${column}${signatureRow}`).value = label; sheet.getCell(`${column}${signatureRow}`).border = { top: thin.top }; sheet.getCell(`${column}${signatureRow}`).alignment = { horizontal: 'center' }; sheet.getCell(`${column}${signatureRow}`).font = { bold: true, size: 7 }; });
+  sheet.mergeCells(`A${signatureRow + 2}:O${signatureRow + 3}`); sheet.getCell(`A${signatureRow + 2}`).value = 'OBSERVACIONES:'; sheet.getCell(`A${signatureRow + 2}`).border = thin; sheet.getCell(`A${signatureRow + 2}`).font = { bold: true, size: 8 };
+  sheet.pageSetup.printArea = `A1:O${signatureRow + 3}`;
+  const buffer = await workbook.xlsx.writeBuffer();
+  downloadBuffer(buffer, `${collectionSheetFilename(report)}.xlsx`);
+}
+
+export async function exportCollectionSheetToPdf(report: PlanillaCobranzaResponse) {
+  const presentation = buildCollectionSheetPresentation(report);
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const logo = await loadTrimmedLogoDataUrl(logoUrl);
+  const logoHeight = 22;
+  const logoWidth = logoHeight * logo.aspectRatio;
+  const widths = [14, 22, 48, 28, 10, 20, 20, 22, 18, 16, 18, 16, 16];
+  presentation.pages.forEach((items, pageIndex) => {
+    if (pageIndex > 0) doc.addPage();
+    doc.addImage(logo.dataUrl, 'PNG', 10, 5, logoWidth, logoHeight, undefined, 'FAST');
+    doc.setDrawColor(96, 120, 120); doc.setTextColor(35, 50, 50);
+    doc.setFontSize(7); doc.setFont('helvetica', 'bold');
+    doc.text('Fecha de Liquidación:', 220, 10); doc.text('Vendedor:', 220, 16); doc.text('Localidad:', 220, 22);
+    doc.setFont('helvetica', 'normal');
+    doc.text(new Date(report.header.FechaIng).toLocaleDateString('es-PE'), 255, 10); doc.text(report.header.Nombre, 255, 16); doc.text(presentation.location, 255, 22);
+    doc.rect(216, 6, 71, 20);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(0, 103, 103);
+    doc.text('P L A N I L L A   D E   C O B R A N Z A', 148.5, 33, { align: 'center' });
+    doc.setTextColor(35, 50, 50); doc.setFontSize(9); doc.text(`Nº ${report.header.Numero}`, 284, 33, { align: 'right' });
+    const body = Array.from({ length: 15 }, (_, index) => {
+      const item = items[index];
+      if (!item) return Array(13).fill('');
+      return [item.CodClie, item.RUC, item.Razon, item.Lugar, documentCode(item.TipoDoc), item.Documento,
+        new Date(item.FechaFac).toLocaleDateString('es-PE'), pdfMoney(item.Valor), item.Descuento ? pdfMoney(item.Descuento) : item.NotaCred,
+        item.Efectivo ? pdfMoney(item.Efectivo) : '', collectionSheetDeposit(item) ? pdfMoney(collectionSheetDeposit(item)) : '',
+        item.Letra ? pdfMoney(item.Letra) : '', item.Cheque ? pdfMoney(item.Cheque) : ''];
+    });
+    autoTable(doc, {
+      startY: 37, margin: { left: 6, right: 6 }, theme: 'grid',
+      head: [['Código Cliente', 'R.U.C.', 'Nombre del cliente', 'Lugar', 'Tipo', 'Número', 'F. Emisión', 'Importe Amortizado', 'Descuento NC', 'Efectivo', 'Depósito', 'Letras', 'Cheque']],
+      body, styles: { fontSize: 5.6, cellPadding: 0.8, minCellHeight: 4.1, valign: 'middle', overflow: 'ellipsize', lineColor: [96, 120, 120], lineWidth: 0.15 },
+      headStyles: { fillColor: [255, 255, 255], textColor: [0, 103, 103], fontStyle: 'bold', halign: 'center' },
+      columnStyles: Object.fromEntries(widths.map((cellWidth, index) => [index, { cellWidth, halign: index >= 7 ? 'right' : 'center' }]))
+    });
+    const isLast = pageIndex === presentation.pages.length - 1;
+    if (isLast) {
+      const y = 116;
+      doc.setFontSize(5.5); doc.setTextColor(0, 103, 103); doc.setFont('helvetica', 'bold');
+      doc.rect(6, y, 168, 17); doc.text('CÓDIGOS DE DOCUMENTO PARA SER USADOS EN LA LIQUIDACIÓN DE PLANILLA DE COBRANZA', 8, y + 4);
+      doc.setTextColor(35, 50, 50); doc.text('1 = FACTURA     2 = LETRA     3 = NOTA DE DÉBITO     4 = NOTA DE CRÉDITO', 8, y + 9);
+      doc.text('5 = PAGO A CUENTA     6 = CHEQUE DEVUELTO     7 = LETRA PROTESTADA     8 = OTROS', 8, y + 14);
+      const summary = [
+        ['TOTAL EFECTIVO', presentation.totals.efectivo], ['TOTAL DEPÓSITO BCO.', presentation.totals.deposito],
+        ['TOTAL LETRAS', presentation.totals.letra], ['TOTAL CHEQUE AL DÍA', presentation.totals.cheque], ['TOTAL COBRADO', presentation.totals.cobrado]
+      ] as const;
+      autoTable(doc, {
+        startY: y, margin: { left: 218, right: 10 }, tableWidth: 69, theme: 'grid',
+        body: summary.map(([label, value]) => [label, pdfMoney(value)]),
+        styles: { fontSize: 5.5, cellPadding: 1.05, minCellHeight: 5, lineColor: [96, 120, 120], lineWidth: 0.15, fontStyle: 'bold' },
+        columnStyles: { 0: { cellWidth: 48 }, 1: { cellWidth: 21, halign: 'right' } },
+        didParseCell: hook => { hook.cell.styles.fillColor = hook.row.index === summary.length - 1 ? [220, 238, 238] : [159, 215, 226]; }
+      });
+      const summaryEndY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+      const paymentCount = Math.max(1, presentation.deposits.length, presentation.checks.length);
+      const paymentBody = Array.from({ length: paymentCount }, (_, index) => {
+        const deposit = presentation.deposits[index];
+        const check = presentation.checks[index];
+        return [
+          deposit?.amount ? pdfMoney(deposit.amount) : '', deposit?.reference || '', deposit?.date ? new Date(deposit.date).toLocaleDateString('es-PE') : '', deposit?.bank || '',
+          check?.amount ? pdfMoney(check.amount) : '', check?.reference || '', check?.date ? new Date(check.date).toLocaleDateString('es-PE') : '', check?.bank || ''
+        ];
+      });
+      autoTable(doc, {
+        startY: Math.max(y + 17, summaryEndY) + 4, margin: { left: 6, right: 6, bottom: 28 }, theme: 'grid',
+        head: [['DEPÓSITOS', 'Nº OPERACIÓN', 'FECHA', 'BANCO', 'CHEQUE', 'NÚMERO', 'FECHA', 'BANCO']], body: paymentBody,
+        styles: { fontSize: 5.5, cellPadding: 0.7, minCellHeight: 5, lineColor: [96, 120, 120], lineWidth: 0.15, overflow: 'ellipsize' },
+        headStyles: { fillColor: [220, 238, 238], textColor: [0, 103, 103], fontStyle: 'bold', halign: 'center' },
+        columnStyles: {
+          0: { cellWidth: 22, halign: 'right' }, 1: { cellWidth: 35 }, 2: { cellWidth: 22 }, 3: { cellWidth: 61 },
+          4: { cellWidth: 22, halign: 'right' }, 5: { cellWidth: 35 }, 6: { cellWidth: 22 }, 7: { cellWidth: 61 }
+        }
+      });
+      let paymentEndY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+      if (paymentEndY > 177) { doc.addPage(); paymentEndY = 12; }
+      const signaturesY = Math.max(184, paymentEndY + 12); doc.setDrawColor(96, 120, 120); doc.line(40, signaturesY, 90, signaturesY); doc.line(123, signaturesY, 173, signaturesY); doc.line(207, signaturesY, 257, signaturesY);
+      doc.setFontSize(6); doc.text('VENDEDOR', 65, signaturesY + 4, { align: 'center' }); doc.text('CAJERO', 148, signaturesY + 4, { align: 'center' }); doc.text('VºBº', 232, signaturesY + 4, { align: 'center' });
+      const observationsY = signaturesY + 12; doc.text('OBSERVACIONES:', 8, observationsY); doc.line(34, observationsY, 287, observationsY);
     }
   });
-
-  let summaryY = ((doc as any).lastAutoTable?.finalY || 44) + 8;
-  if (summaryY > 205) {
-    doc.addPage();
-    summaryY = 48;
-  }
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(0, 103, 103);
-  doc.text('RESUMEN DE MEDIOS DE PAGO', 12, summaryY);
-  const paymentRows = [
-    ['Descuento', totals.Descuento], ['Efectivo', totals.Efectivo], ['Depósito', totals.Deposito],
-    ['Letra', totals.Letra], ['Transferencia', totals.Transferencia], ['Cheque', totals.Cheque]
-  ] as const;
-  paymentRows.forEach(([label, value], index) => {
-    const column = index % 2;
-    const row = Math.floor(index / 2);
-    const x = 12 + column * 72;
-    const y = summaryY + 8 + row * 8;
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(62, 73, 72);
-    doc.setFontSize(8);
-    doc.text(label, x, y);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`S/ ${pdfMoney(value)}`, x + 68, y, { align: 'right' });
-  });
-  const totalY = summaryY + 36;
-  doc.setFillColor(0, 103, 103);
-  doc.roundedRect(12, totalY, 186, 15, 2, 2, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(10);
-  doc.text('TOTAL GENERAL COBRADO', 17, totalY + 9.5);
-  doc.setFontSize(13);
-  doc.text(`S/ ${pdfMoney(totals.TotalGeneral)}`, 193, totalY + 10, { align: 'right' });
-  const signatureY = totalY + 35;
-  doc.setDrawColor(111, 121, 121);
-  doc.line(25, signatureY, 85, signatureY);
-  doc.line(125, signatureY, 185, signatureY);
-  doc.setTextColor(62, 73, 72);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.text('Elaborado por', 55, signatureY + 5, { align: 'center' });
-  doc.text('Recibido por', 155, signatureY + 5, { align: 'center' });
-
   const pageCount = doc.getNumberOfPages();
   for (let page = 1; page <= pageCount; page += 1) {
-    doc.setPage(page);
-    doc.setTextColor(25, 28, 29);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.text('COMPAÑIA DISTRIBUIDORA AMERICANA S.A.C.', 12, 12);
-    doc.setFontSize(14);
-    doc.setTextColor(0, 103, 103);
-    doc.text('PLANILLA DE COBRANZA', 12, 21);
-    doc.setFontSize(9);
-    doc.setTextColor(25, 28, 29);
-    doc.text(`${header.Serie}-${header.Numero}`, 198, 13, { align: 'right' });
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.text(`Vendedor: ${header.Vendedor} - ${header.Nombre}`, 12, 29);
-    doc.text(`Forma de pago: ${header.FormaPago || 'No especificada'}`, 12, 35);
-    doc.text(`Creación: ${new Date(header.FechaCrea).toLocaleDateString('es-PE')}  ·  Ingreso: ${new Date(header.FechaIng).toLocaleDateString('es-PE')}`, 198, 29, { align: 'right' });
-    doc.setTextColor(111, 121, 121);
-    doc.text(`Generado: ${generatedAt}`, 12, 289);
-    doc.text(`Página ${page} de ${pageCount}`, 198, 289, { align: 'right' });
+    doc.setPage(page); doc.setFontSize(5.5); doc.setTextColor(111, 121, 121);
+    doc.text(`Página ${page} de ${pageCount}`, 287, 207, { align: 'right' });
   }
   doc.save(`${collectionSheetFilename(report)}.pdf`);
 }
