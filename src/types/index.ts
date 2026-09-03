@@ -105,10 +105,21 @@ export interface TransaccionMovimiento {
 }
 
 export interface KpiSummary {
-  totalClientes: { valor: string; variacion: string; positivo: boolean };
-  totalUsuarios: { valor: string; variacion: string; positivo: boolean };
-  procesosEjecutados: { valor: string; estado: string };
+  ventasMes: {
+    mes: string;
+    anio: number;
+    numeroVentas: number;
+    totalVentas: number;
+  };
+  ventasMesAnterior: {
+    mes: string;
+    anio: number;
+    numeroVentas: number;
+    totalVentas: number;
+  };
+  pedidosPorFacturar: { cantidad: number };
   registrosDia: { valor: string; variacion: string; positivo: boolean };
+  actualizadoEn: string;
 }
 
 export interface ChartActivityData {

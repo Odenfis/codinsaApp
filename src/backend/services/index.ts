@@ -6,6 +6,7 @@
 import { AuthRepository, ClientRepository, ProviderRepository, UserRepository, ReportRepository, AuditRepository } from '../repositories';
 import { db } from '../db/database';
 import { LoginResponseDto, Modulo } from '../../types';
+import { getDbPool, sql } from '../../db';
 
 export class AuthService {
   constructor(private authRepo: AuthRepository = new AuthRepository()) {}
@@ -45,12 +46,56 @@ export class AuthService {
 }
 
 export class DashboardService {
-  getSummary() {
+  async getSummary() {
+    const ahora = new Date();
+    const mesActual = ahora.getMonth() + 1;
+    const anioActual = ahora.getFullYear();
+    const fechaMesAnterior = new Date(anioActual, mesActual - 2, 1);
+    const nombresMeses = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    const pool = await getDbPool();
+    const [ventasMesResult, ventasMesAnteriorResult, pedidosResult] = await Promise.all([
+      pool.request()
+        .input('mes', sql.Int, mesActual)
+        .input('anio', sql.Int, anioActual)
+        .execute('[dbo].[sp_Estadistica_VentasMes]'),
+      pool.request()
+        .input('mes', sql.Int, mesActual)
+        .input('anio', sql.Int, anioActual)
+        .execute('[dbo].[sp_Estadistica_VentasMesAntes]'),
+      pool.request().execute('[dbo].[sp_Estadistica_PedidosxFacturar]')
+    ]);
+
+    const ventasMes = ventasMesResult.recordset[0] ?? {};
+    const ventasMesAnterior = ventasMesAnteriorResult.recordset[0] ?? {};
+    const pedidos = pedidosResult.recordset[0] ?? {};
+
+    const normalizarNumero = (valor: unknown): number => {
+      const numero = Number(valor ?? 0);
+      return Number.isFinite(numero) ? numero : 0;
+    };
+
     return {
-      totalClientes: { valor: '1,284', variacion: '+12% este mes', positivo: true },
-      totalUsuarios: { valor: '8,592', variacion: '+5% este mes', positivo: true },
-      procesosEjecutados: { valor: '45.2k', estado: 'Estable' },
-      registrosDia: { valor: '342', variacion: '-2% hoy', positivo: false }
+      ventasMes: {
+        mes: nombresMeses[mesActual - 1],
+        anio: anioActual,
+        numeroVentas: normalizarNumero(ventasMes.NroVentas),
+        totalVentas: normalizarNumero(ventasMes.TotVentas)
+      },
+      ventasMesAnterior: {
+        mes: nombresMeses[fechaMesAnterior.getMonth()],
+        anio: fechaMesAnterior.getFullYear(),
+        numeroVentas: normalizarNumero(ventasMesAnterior.NroVentasAntes),
+        totalVentas: normalizarNumero(ventasMesAnterior.TotVentasAntes)
+      },
+      pedidosPorFacturar: {
+        cantidad: normalizarNumero(pedidos.PedxFacturar)
+      },
+      registrosDia: { valor: '342', variacion: '-2% hoy', positivo: false },
+      actualizadoEn: new Date().toISOString()
     };
   }
 

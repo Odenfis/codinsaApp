@@ -136,8 +136,13 @@ app.get('/api/modules', authMiddleware, (req: AuthenticatedRequest, res: Respons
 // 2. ENDPOINTS DEL DASHBOARD INICIAL (KPIs, Gráficos y Transacciones)
 // ==============================================================================
 
-app.get('/api/dashboard/summary', authMiddleware, (req: Request, res: Response) => {
-  return res.json(dashboardService.getSummary());
+app.get('/api/dashboard/summary', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    return res.json(await dashboardService.getSummary());
+  } catch (err: any) {
+    console.error('[DASHBOARD SUMMARY ERROR]', err);
+    return res.status(500).json({ error: 'No se pudieron obtener las estadísticas del dashboard.' });
+  }
 });
 
 app.get('/api/dashboard/activity', authMiddleware, (req: Request, res: Response) => {

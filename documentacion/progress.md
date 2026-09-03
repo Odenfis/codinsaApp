@@ -517,12 +517,39 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
 
 **01/09/2026** — Incorporación explícita de Transferencia en todo el formato operativo.
 
-- Transferencia se separó de Depósito en el modelo compartido y ahora aparece entre Letras y Cheque en pantalla, Excel y PDF.
-- Los totales y el resumen inferior muestran Transferencia de forma independiente, manteniendo Total cobrado como la suma de todos los medios de pago.
-- Depósitos, Transferencias y Cheques disponen de bloques separados con monto, referencia, fecha y banco, sin duplicar importes.
-- Se reajustaron anchos, combinaciones de celdas y flujo multipágina para conservar el formato horizontal, las firmas y las observaciones.
+- Se aprovechó la columna `pd.Transferencia` ya expuesta por `sp_Planilla_cobranza`, la API y los tipos existentes; no fue necesario modificar el procedimiento almacenado ni el contrato del endpoint.
+- El modelo compartido dejó de acumular Transferencia dentro de Depósito y ahora calcula `deposito`, `letra`, `transferencia` y `cheque` por separado. `Total cobrado` conserva la suma de Descuento + Efectivo + Depósito + Letra + Transferencia + Cheque.
+- En la vista previa, **Transferencia** aparece entre **Letras** y **Cheque** dentro de Forma de Pago, incluyendo valores por documento, fila de totales y `TOTAL TRANSFERENCIA` en el resumen inferior.
+- Depósitos, Transferencias y Cheques disponen de bloques independientes. Las transferencias muestran monto, número de operación, fecha y banco, y los registros con importe cero quedan excluidos del detalle.
+- El Excel se amplió de `A:O` a `A:P`; se reajustaron anchos, celdas combinadas, fórmulas, área de impresión, resumen, firmas y observaciones para conservar la planilla horizontal imprimible.
+- El PDF A4 horizontal incorpora la nueva columna y distribuye los tres bloques de movimientos de forma coordinada, manteniendo el flujo multipágina y evitando superposiciones con firmas, observaciones y numeración.
+- Se conservaron el diseño, colores, logotipo, tipografía, paginación de 15 documentos y nombres `Planilla_Cobranza_SERIE_NUMERO.xlsx|pdf`.
+- **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente; solo permanece la advertencia informativa preexistente sobre el tamaño del bundle.
+- Estado: ✅
+
+## 25. Dashboard con estadísticas reales de ventas y pedidos
+
+**02/09/2026** — Las tres primeras tarjetas del dashboard dejaron de usar métricas simuladas y ahora consultan los procedimientos almacenados operativos de SQL Server.
+
+- **Ventas del Mes:** ejecuta `[dbo].[sp_Estadistica_VentasMes]` con el mes y año actuales del servidor. Muestra `TotVentas` como importe PEN y `NroVentas` como cantidad de operaciones; el nombre del mes y el año aparecen en la tarjeta.
+- **Ventas Mes Anterior:** ejecuta `[dbo].[sp_Estadistica_VentasMesAntes]` pasando el mes y año actuales. El procedimiento conserva su propia lógica de retroceso y la interfaz calcula la etiqueta correspondiente, incluido el cambio de enero a diciembre del año anterior.
+- **Pedidos por Facturar:** ejecuta `[dbo].[sp_Estadistica_PedidosxFacturar]` sin parámetros y muestra `PedxFacturar`.
+- El endpoint protegido `GET /api/dashboard/summary` ahora es asíncrono, utiliza parámetros `sql.Int`, normaliza nulos y valores numéricos, informa la hora real de actualización y devuelve un error controlado si SQL Server o un procedimiento falla.
+- La interfaz formatea importes con `Intl.NumberFormat` para `es-PE` y moneda PEN, conserva correctamente los valores cero y muestra estados de carga/error sin afectar el resto del dashboard.
+- Se conservaron sin cambios la cuarta tarjeta, los endpoints de actividad y transacciones, el gráfico, los accesos rápidos y la exportación existente.
+- **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente.
+- Estado: ✅
+
+## 26. Refinamiento visual de las tarjetas KPI del dashboard
+
+**02/09/2026** — Se mejoró la distribución vertical de las cuatro tarjetas KPI para separar con claridad el valor principal de su texto descriptivo.
+
+- La altura uniforme de las tarjetas aumentó de `130px` a `150px`, conservando el padding, bordes, colores, sombras e iconografía existentes.
+- Cada tarjeta quedó organizada en una cabecera y un bloque inferior que agrupa el valor con su descripción mediante una separación explícita de `8px`.
+- Se ajustaron alturas de línea, alineación de iconos, cifras tabulares y comportamiento de textos largos para evitar desbordes en escritorio, tablet y móvil.
+- El cambio es exclusivamente visual; no modifica procedimientos almacenados, endpoints, contratos, cálculos ni formatos de datos.
 - **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente.
 - Estado: ✅
 
 ---
-*Última actualización: 01 de Septiembre, 2026*
+*Última actualización: 02 de Septiembre, 2026*
