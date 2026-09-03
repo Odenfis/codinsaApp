@@ -146,8 +146,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateToModule
       {/* Grid de 4 Tarjetas KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1 */}
-        <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-variant shadow-sm flex h-[150px] flex-col justify-between hover:shadow transition-shadow">
-          <div className="flex items-center justify-between gap-3">
+        <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-variant shadow-sm flex h-[150px] min-w-0 flex-col hover:shadow transition-shadow">
+          <div className="flex shrink-0 items-center justify-between gap-3">
             <span className="min-w-0 text-xs font-bold uppercase leading-4 tracking-wider text-on-surface-variant">
               Ventas del Mes <span className="text-primary">{summary?.ventasMes.mes ?? '—'}</span>
             </span>
@@ -155,18 +155,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateToModule
               <ShoppingCart size={18} />
             </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <span className="font-headline text-3xl font-bold leading-none tabular-nums text-on-surface">{summary ? currencyFormatter.format(summary.ventasMes.totalVentas) : '—'}</span>
-            <div className="flex min-h-4 items-start gap-1 text-xs font-bold leading-4 text-secondary">
-              <ShoppingCart size={14} className="mt-px shrink-0" />
-              <span>{summary ? `${numberFormatter.format(summary.ventasMes.numeroVentas)} ventas · ${summary.ventasMes.anio}` : 'Consultando ventas...'}</span>
-            </div>
+          <div className="flex min-h-0 flex-1 items-center overflow-hidden">
+            <span className="max-w-full truncate font-headline text-3xl font-bold leading-none tabular-nums text-on-surface">{summary ? currencyFormatter.format(summary.ventasMes.totalVentas) : '—'}</span>
+          </div>
+          <div className="flex min-h-4 min-w-0 shrink-0 items-start gap-1 text-xs font-bold leading-4 text-secondary">
+            <ShoppingCart size={14} className="mt-px shrink-0" />
+            <span className="truncate">{summary ? `${numberFormatter.format(summary.ventasMes.numeroVentas)} ventas · ${summary.ventasMes.anio}` : 'Consultando ventas...'}</span>
           </div>
         </div>
 
         {/* KPI 2 */}
-        <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-variant shadow-sm flex h-[150px] flex-col justify-between hover:shadow transition-shadow">
-          <div className="flex items-center justify-between gap-3">
+        <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-variant shadow-sm flex h-[150px] min-w-0 flex-col hover:shadow transition-shadow">
+          <div className="flex shrink-0 items-center justify-between gap-3">
             <span className="min-w-0 text-xs font-bold uppercase leading-4 tracking-wider text-on-surface-variant">
               Ventas Mes Anterior <span className="text-primary">{summary?.ventasMesAnterior.mes ?? '—'}</span>
             </span>
@@ -174,46 +174,46 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateToModule
               <CalendarClock size={18} />
             </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <span className="font-headline text-3xl font-bold leading-none tabular-nums text-on-surface">{summary ? currencyFormatter.format(summary.ventasMesAnterior.totalVentas) : '—'}</span>
-            <div className="flex min-h-4 items-start gap-1 text-xs font-bold leading-4 text-secondary">
-              <CalendarClock size={14} className="mt-px shrink-0" />
-              <span>{summary ? `${numberFormatter.format(summary.ventasMesAnterior.numeroVentas)} ventas · ${summary.ventasMesAnterior.anio}` : 'Consultando ventas...'}</span>
-            </div>
+          <div className="flex min-h-0 flex-1 items-center overflow-hidden">
+            <span className="max-w-full truncate font-headline text-3xl font-bold leading-none tabular-nums text-on-surface">{summary ? currencyFormatter.format(summary.ventasMesAnterior.totalVentas) : '—'}</span>
+          </div>
+          <div className="flex min-h-4 min-w-0 shrink-0 items-start gap-1 text-xs font-bold leading-4 text-secondary">
+            <CalendarClock size={14} className="mt-px shrink-0" />
+            <span className="truncate">{summary ? `${numberFormatter.format(summary.ventasMesAnterior.numeroVentas)} ventas · ${summary.ventasMesAnterior.anio}` : 'Consultando ventas...'}</span>
           </div>
         </div>
 
         {/* KPI 3 */}
-        <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-variant shadow-sm flex h-[150px] flex-col justify-between hover:shadow transition-shadow">
-          <div className="flex items-center justify-between gap-3">
+        <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-variant shadow-sm flex h-[150px] min-w-0 flex-col hover:shadow transition-shadow">
+          <div className="flex shrink-0 items-center justify-between gap-3">
             <span className="min-w-0 text-xs font-bold uppercase leading-4 tracking-wider text-on-surface-variant">Pedidos por Facturar</span>
             <div className="w-8 h-8 shrink-0 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container">
               <ClipboardList size={18} />
             </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <span className="font-headline text-4xl font-bold leading-none tabular-nums text-on-surface">{summary ? numberFormatter.format(summary.pedidosPorFacturar.cantidad) : '—'}</span>
-            <div className="flex min-h-4 items-start gap-1 text-xs font-bold leading-4 text-outline">
-              <ClipboardList size={14} className="mt-px shrink-0" />
-              <span>{summary ? 'Pedidos pendientes de facturación' : 'Consultando pedidos...'}</span>
-            </div>
+          <div className="flex min-h-0 flex-1 items-center overflow-hidden">
+            <span className="max-w-full truncate font-headline text-4xl font-bold leading-none tabular-nums text-on-surface">{summary ? numberFormatter.format(summary.pedidosPorFacturar.cantidad) : '—'}</span>
+          </div>
+          <div className="flex min-h-4 min-w-0 shrink-0 items-start gap-1 text-xs font-bold leading-4 text-outline">
+            <ClipboardList size={14} className="mt-px shrink-0" />
+            <span className="truncate">{summary ? 'Pedidos pendientes de facturación' : 'Consultando pedidos...'}</span>
           </div>
         </div>
 
         {/* KPI 4 */}
-        <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-variant shadow-sm flex h-[150px] flex-col justify-between hover:shadow transition-shadow">
-          <div className="flex items-center justify-between gap-3">
+        <div className="bg-surface-container-lowest p-5 rounded-xl border border-surface-variant shadow-sm flex h-[150px] min-w-0 flex-col hover:shadow transition-shadow">
+          <div className="flex shrink-0 items-center justify-between gap-3">
             <span className="min-w-0 text-xs font-bold uppercase leading-4 tracking-wider text-on-surface-variant">Registros del Día</span>
             <div className="w-8 h-8 shrink-0 rounded-full bg-error-container flex items-center justify-center text-on-error-container">
               <FilePlus size={18} />
             </div>
           </div>
-          <div className="flex flex-col gap-2">
-            <span className="font-headline text-4xl font-bold leading-none tabular-nums text-on-surface">{summary?.registrosDia.valor ?? '342'}</span>
-            <div className="flex min-h-4 items-start gap-1 text-xs font-bold leading-4 text-error">
-              <TrendingDown size={14} className="mt-px shrink-0" />
-              <span>{summary?.registrosDia.variacion ?? '-2% hoy'}</span>
-            </div>
+          <div className="flex min-h-0 flex-1 items-center overflow-hidden">
+            <span className="max-w-full truncate font-headline text-4xl font-bold leading-none tabular-nums text-on-surface">{summary?.registrosDia.valor ?? '342'}</span>
+          </div>
+          <div className="flex min-h-4 min-w-0 shrink-0 items-start gap-1 text-xs font-bold leading-4 text-error">
+            <TrendingDown size={14} className="mt-px shrink-0" />
+            <span className="truncate">{summary?.registrosDia.variacion ?? '-2% hoy'}</span>
           </div>
         </div>
       </div>

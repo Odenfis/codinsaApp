@@ -551,5 +551,17 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
 - **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente.
 - Estado: ✅
 
+## 27. Centrado vertical de los valores KPI del dashboard
+
+**03/09/2026** — Se reorganizaron las cuatro tarjetas KPI para aprovechar mejor su espacio vertical y destacar las cifras principales.
+
+- Cada tarjeta utiliza tres zonas consistentes: cabecera fija, valor principal dentro de una zona central flexible y descripción fija al pie.
+- Los importes y cantidades permanecen alineados a la izquierda, pero ahora quedan centrados verticalmente en el espacio disponible entre la cabecera y el texto secundario.
+- Se conservaron la altura de `150px`, los tamaños tipográficos, colores, iconos, bordes, sombras y comportamiento responsive existentes.
+- Se agregaron controles de ancho y truncamiento para impedir que cifras o descripciones extensas desborden las tarjetas.
+- El cambio es exclusivamente visual; no modifica procedimientos almacenados, endpoints, contratos, cálculos ni formatos de datos.
+- **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente.
+- Estado: ✅
+
 ---
-*Última actualización: 02 de Septiembre, 2026*
+*Última actualización: 03 de Septiembre, 2026*
