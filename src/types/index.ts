@@ -233,6 +233,110 @@ export interface CobranzaReporteResponse {
   totals: CobranzaReporteTotals;
 }
 
+export interface KardexProductoRow {
+  FecIni: string;
+  FecFin: string;
+  codpro: string;
+  codSunat: string;
+  Producto: string;
+  Unimed: string;
+  Saldoini: number;
+  Ingresos: number;
+  salidas: number;
+  saldoFin: number;
+  Costo: number;
+  Valor: number;
+}
+
+export interface KardexProductoTotals {
+  Saldoini: number;
+  Ingresos: number;
+  salidas: number;
+  saldoFin: number;
+  Valor: number;
+}
+
+export interface KardexProductoResponse {
+  data: KardexProductoRow[];
+  total: number;
+  totals: KardexProductoTotals;
+  period: {
+    mes: number;
+    anio: number;
+    desde: string;
+    hasta: string;
+  };
+}
+
+export interface ValuedStockMovement {
+  Numero: number;
+  Fecha: string;
+  TipoDoc: string;
+  Documento: string;
+  StockIni: number;
+  Ingresos: number;
+  CosIng: number;
+  CostoI: number;
+  Salidas: number;
+  CosUnit: number;
+  CostoS: number;
+  Saldo: number;
+  ValorUni: number;
+  Valorizado: number;
+}
+
+export interface ValuedStockRow {
+  Codpro: string;
+  Lote: string;
+  Almacen: number;
+  CodSunat: string;
+  TipoPro: string;
+  Descripcion: string;
+  UniMed: string;
+  StockIni: number;
+  InitialValorUni: number;
+  InitialValorizado: number;
+  Ingresos: number;
+  Salidas: number;
+  Saldo: number;
+  ValorUni: number;
+  Valorizado: number;
+  movements: ValuedStockMovement[];
+}
+
+export interface ValuedStockTotals {
+  StockIni: number;
+  Ingresos: number;
+  Salidas: number;
+  Saldo: number;
+  Valorizado: number;
+}
+
+export interface ValuedStockResponse {
+  data: ValuedStockRow[];
+  total: number;
+  movementTotal: number;
+  totals: ValuedStockTotals;
+  period: { mes: number; anio: number; desde: string; hasta: string };
+}
+
+export interface ProductStockRow {
+  Codigo: string;
+  CodSunat: string;
+  Producto: string;
+  PrincipioActivo: string;
+  stock: number;
+  PVF: number | null;
+  Lotes: string;
+  vencimiento: string | null;
+}
+
+export interface ProductStockResponse {
+  data: ProductStockRow[];
+  total: number;
+  generatedAt: string;
+}
+
 export interface PlanillaCobranzaSerie {
   Serie: string;
 }

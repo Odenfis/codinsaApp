@@ -21,6 +21,7 @@ import { BackupScheduler } from './src/backend/backup/backupScheduler';
 import { getNisiraCount, exportNisiraToDbf, runNisiraSp, exportNisiraToDbfDirect } from './src/backend/services/NisiraExportService';
 import { NisiraExportConfigManager } from './src/backend/nisiraConfig';
 import { ErpUpdateConfigManager } from './src/backend/erpUpdateConfig';
+import { buildValuedStockReport } from './src/backend/services/valuedStockReport';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -525,6 +526,188 @@ app.get('/api/reportes/planilla-cobranza', authMiddleware, async (req: Request, 
   } catch (err) {
     console.error('[PLANILLA COBRANZA ERROR]', err);
     return res.status(500).json({ error: 'No se pudo generar la planilla de cobranza. Inténtelo nuevamente.' });
+  }
+});
+
+const kardexNumericFields = ['Saldoini', 'Ingresos', 'salidas', 'saldoFin', 'Costo', 'Valor'] as const;
+const kardexTotalFields = ['Saldoini', 'Ingresos', 'salidas', 'saldoFin', 'Valor'] as const;
+
+app.get('/api/reportes/kardex-productos', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const mes = Number(req.query.mes);
+  const anio = Number(req.query.anio);
+
+  if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
+    return res.status(400).json({ error: 'El mes debe ser un número entero entre 1 y 12.' });
+  }
+  if (!Number.isInteger(anio) || anio < 1900 || anio > 2100) {
+    return res.status(400).json({ error: 'El año debe ser un número entero entre 1900 y 2100.' });
+  }
+
+  try {
+    const pool = await getDbPool();
+    const transaction = new sql.Transaction(pool);
+    let result;
+    try {
+      await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+      result = await new sql.Request(transaction)
+        .input('mes', sql.Int, mes)
+        .input('anio', sql.Int, anio)
+        .query(`
+          DECLARE @lockResult INT;
+          EXEC @lockResult = sys.sp_getapplock
+            @Resource = 'CODINSA_KARDEX_PRODUCTOS',
+            @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction',
+            @LockTimeout = 30000;
+          IF @lockResult < 0
+            THROW 51000, 'No se pudo reservar la generación del Kardex. Inténtelo nuevamente.', 1;
+
+          EXEC [dbo].[sp_KardexDelMesX] @mes = @mes, @anio = @anio;
+
+          SELECT FecIni, FecFin, codpro, codSunat, Producto, Unimed,
+                 Saldoini, Ingresos, salidas, saldoFin, Costo, Valor
+          FROM [dbo].[LibInvValorizado]
+          ORDER BY Producto, codpro;
+        `);
+      await transaction.commit();
+    } catch (transactionError) {
+      try { await transaction.rollback(); } catch { /* La transacción puede haber sido cerrada por SQL Server. */ }
+      throw transactionError;
+    }
+
+    const textValue = (value: unknown) => value == null ? '' : String(value).trim();
+    const dateValue = (value: unknown) => value instanceof Date ? value.toISOString() : textValue(value);
+    const data = result.recordset.map((record: Record<string, unknown>) => {
+      const normalized: Record<string, unknown> = {
+        FecIni: dateValue(record.FecIni),
+        FecFin: dateValue(record.FecFin),
+        codpro: textValue(record.codpro),
+        codSunat: textValue(record.codSunat),
+        Producto: textValue(record.Producto),
+        Unimed: textValue(record.Unimed)
+      };
+      for (const field of kardexNumericFields) {
+        const value = Number(record[field] ?? 0);
+        normalized[field] = Number.isFinite(value) ? value : 0;
+      }
+      return normalized;
+    });
+    const totals = Object.fromEntries(kardexTotalFields.map(field => [
+      field,
+      data.reduce((sum: number, row: Record<string, unknown>) => sum + Number(row[field] || 0), 0)
+    ]));
+    const lastDay = new Date(Date.UTC(anio, mes, 0)).getUTCDate();
+    const period = {
+      mes,
+      anio,
+      desde: `${anio}-${String(mes).padStart(2, '0')}-01`,
+      hasta: `${anio}-${String(mes).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    };
+
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Kardex de Productos ${String(mes).padStart(2, '0')}/${anio} (${data.length} registros)`,
+      req.ip
+    );
+    return res.json({ data, total: data.length, totals, period });
+  } catch (err) {
+    console.error('[KARDEX PRODUCTOS ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el Kardex de Productos. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/stock-valorizado', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const mes = Number(req.query.mes);
+  const anio = Number(req.query.anio);
+  if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
+    return res.status(400).json({ error: 'El mes debe ser un número entero entre 1 y 12.' });
+  }
+  if (!Number.isInteger(anio) || anio < 1900 || anio > 2100) {
+    return res.status(400).json({ error: 'El año debe ser un número entero entre 1900 y 2100.' });
+  }
+
+  try {
+    const pool = await getDbPool();
+    const transaction = new sql.Transaction(pool);
+    let report;
+    try {
+      await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+      const request = new sql.Request(transaction);
+      (request as sql.Request & { timeout: number }).timeout = 300000;
+      const result = await request
+        .input('mes', sql.Int, mes)
+        .input('anio', sql.Int, anio)
+        .query(`
+          DECLARE @lockResult INT;
+          EXEC @lockResult = sys.sp_getapplock
+            @Resource = 'CODINSA_STOCK_VALORIZADO',
+            @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction',
+            @LockTimeout = 30000;
+          IF @lockResult < 0
+            THROW 51001, 'No se pudo reservar la generación del Stock Valorizado. Inténtelo nuevamente.', 1;
+
+          EXEC [dbo].[sp_KardexDelMesD] @mes = @mes, @anio = @anio;
+
+          SELECT Numero, Codpro, Lote, Almacen, CodSunat, TipoPro, Descripcion, UniMed,
+                 Fecha, TipoDoc, Documento, StockIni, Ingresos, CosIng, CostoI,
+                 Salidas, CosUnit, CostoS, Saldo, ValorUni, Valorizado
+          FROM [dbo].[LibInvValorizadoD]
+          ORDER BY Codpro, Lote, Almacen, Numero;
+        `);
+      report = buildValuedStockReport(result.recordset as Record<string, unknown>[], mes, anio);
+      await transaction.commit();
+    } catch (transactionError) {
+      try { await transaction.rollback(); } catch { /* SQL Server puede haber cerrado la transacción. */ }
+      throw transactionError;
+    }
+
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Stock Valorizado ${String(mes).padStart(2, '0')}/${anio} (${report.total} lotes)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    console.error('[STOCK VALORIZADO ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el Stock Valorizado. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/stock-productos', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request().execute('sp_Productos_SaldosStock');
+    const cleanText = (value: unknown) => value == null ? '' : String(value).trim();
+    const data = result.recordset.map((record: Record<string, unknown>) => {
+      const stock = Number(record.stock ?? 0);
+      const pvf = record.PVF == null ? null : Number(record.PVF);
+      const expiry = record.vencimiento instanceof Date
+        ? record.vencimiento.toISOString().slice(0, 10)
+        : record.vencimiento == null ? null : String(record.vencimiento).slice(0, 10);
+      return {
+        Codigo: cleanText(record.Codigo),
+        CodSunat: cleanText(record.CodSunat),
+        Producto: cleanText(record.Producto),
+        PrincipioActivo: cleanText(record.PrincipioActivo),
+        stock: Number.isFinite(stock) ? stock : 0,
+        PVF: pvf !== null && Number.isFinite(pvf) ? pvf : null,
+        Lotes: cleanText(record.Lotes),
+        vencimiento: expiry
+      };
+    }).sort((a, b) => a.Producto.localeCompare(b.Producto, 'es') || a.Codigo.localeCompare(b.Codigo) || a.Lotes.localeCompare(b.Lotes) || (a.vencimiento || '').localeCompare(b.vencimiento || ''));
+
+    res.setHeader('Cache-Control', 'no-store');
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes', `Consultó Stock de Productos (${data.length} lotes)`, req.ip
+    );
+    return res.json({ data, total: data.length, generatedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error('[STOCK PRODUCTOS ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo obtener el Stock de Productos. Inténtelo nuevamente.' });
   }
 });
 

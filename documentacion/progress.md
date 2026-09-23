@@ -563,5 +563,52 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
 - **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente.
 - Estado: ✅
 
+## 28. Reportes / Almacén / Kardex de Productos
+
+**22/09/2026** — Nuevo reporte mensual de inventario valorizado basado en `sp_KardexDelMesX`.
+
+- Se agregó la navegación de tres niveles **Reportes → Almacén → Kardex de Productos**, con ruta `/reports/warehouse/product-kardex`, iconos propios y acceso para Administrador, Auditor Senior y Gestor Operativo mediante los módulos `19` y `20`.
+- Se versionó el procedimiento proporcionado en `sql/sp_KardexDelMesX.sql` sin alterar su lógica interna.
+- Nuevo endpoint protegido `GET /api/reportes/kardex-productos?mes=...&anio=...`:
+  - Valida mes y año como enteros dentro de rangos permitidos.
+  - Ejecuta `[dbo].[sp_KardexDelMesX]` con parámetros `sql.Int`.
+  - Lee posteriormente `LibInvValorizado`, ya que el procedimiento carga la tabla pero no devuelve un conjunto de resultados.
+  - Normaliza textos, cantidades e importes y devuelve periodo, registros y totales de saldo inicial, ingresos, salidas, saldo final y valor.
+  - Registra la generación en auditoría.
+- La ejecución y lectura se realizan en una transacción `SERIALIZABLE` protegida con `sp_getapplock`, evitando que dos solicitudes de la aplicación para meses diferentes mezclen el contenido de la tabla compartida `LibInvValorizado`.
+- Nueva vista `ProductKardexReportView.tsx` con logotipo oficial en la cabecera superior izquierda, selectores de mes/año, estados de carga/error/sin resultados, seis tarjetas resumen, tabla responsive con scroll horizontal, código fijo y paginación de 20 productos.
+- Exportación Excel profesional con `exceljs`: logo, título, periodo, fecha de generación, datos numéricos, formatos de cantidades/importes, autofiltro, encabezado congelado, totales y configuración de impresión horizontal.
+- Exportación PDF A4 horizontal con logo, periodo, fecha/hora, encabezados repetidos, filas alternadas, totales y numeración `Página X de Y`.
+- Nuevos tipos compartidos: `KardexProductoRow`, `KardexProductoTotals` y `KardexProductoResponse`.
+- **Validación:** `npm run lint`, `npm run build` y `git diff --check` finalizaron correctamente. La ejecución real del SP queda para la prueba funcional con el periodo que seleccione el usuario, porque el procedimiento reemplaza el contenido global de `LibInvValorizado`.
+- Estado: ✅
+
+## 29. Reportes / Almacén / Stock Valorizado
+
+**22/09/2026** — Nuevo reporte mensual por producto, lote y almacén basado en `[dbo].[sp_KardexDelMesD]`.
+
+- Se agregó **Stock Valorizado** bajo **Reportes → Almacén**, con ruta `/reports/warehouse/valued-stock` y los mismos permisos de menú que Kardex de Productos (módulo `21`).
+- El procedimiento proporcionado se versionó en `sql/sp_KardexDelMesD.sql`; su ejecución continúa llamando al auxiliar existente `sp_KardexDelMesD1`.
+- El endpoint autenticado `GET /api/reportes/stock-valorizado?mes=...&anio=...` valida el periodo, ejecuta el SP y consulta `LibInvValorizadoD` dentro de una transacción `SERIALIZABLE` protegida con `sp_getapplock`. Devuelve saldos finales, movimientos asociados, cantidad de lotes y totales.
+- Cada combinación producto/lote/almacén conserva su fila `Numero = 0` como saldo inicial y ordena los movimientos por `Numero`, igual que el cursor del SP. El saldo y valor final se toman del último movimiento, o de la fila inicial si no hubo movimientos. Los valores de distintas filas de un mismo lote no se suman.
+- La vista incluye logo oficial, Mes/Año, tarjetas resumen, tabla adaptable paginada y detalle desplegable de movimientos por lote.
+- Excel contiene hojas **Saldos finales** y **Movimientos**, con logo, datos numéricos, autofiltro y totales; PDF A4 horizontal contiene el resumen con logo, periodo, fecha, encabezados repetidos y paginación.
+- Se agregaron los tipos `ValuedStockMovement`, `ValuedStockRow`, `ValuedStockTotals` y `ValuedStockResponse`, más pruebas del agrupamiento y totales.
+- **Validación:** pruebas unitarias, TypeScript, build, `git diff --check` y revisión visual en escritorio/móvil. Una ejecución de agosto de 2026 dentro de una transacción revertida generó 1458 lotes y 1350 movimientos; el total calculado (`S/ 1,797,952.95` al formatear) coincidió con la consulta SQL de las últimas filas. Otro periodo sin movimientos conservó los saldos iniciales como finales. `LibInvValorizadoD` conservó sus 11 filas previas tras el `ROLLBACK`.
+- Estado: ✅
+
+## 30. Reportes / Almacén / Stock de Productos
+
+**22/09/2026** — Reporte de existencias por producto y lote basado en `[dbo].[sp_Productos_SaldosStock]`.
+
+- Se añadió **Stock de Productos** bajo **Reportes → Almacén**, con ruta `/reports/warehouse/product-stock` y los mismos permisos de los reportes de Almacén (módulo `22`).
+- Se versionó el procedimiento proporcionado en `sql/sp_Productos_SaldosStock.sql`, sin modificar sus filtros ni cálculos. A diferencia de los kardex mensuales, no requiere Mes/Año y no reemplaza tablas: la consulta se carga al abrir la vista y puede actualizarse manualmente.
+- El endpoint autenticado `GET /api/reportes/stock-productos` ejecuta el SP sin parámetros, normaliza códigos, textos, cantidades, PVF y vencimiento, devuelve fecha de consulta y audita la operación. La respuesta impide caché para reflejar el stock vigente.
+- La vista mantiene el estándar de Almacén: logo oficial, resumen, tabla adaptable con scroll horizontal y paginación de 20 lotes, estados de carga/error/sin datos, Excel y PDF con logo y fecha de consulta.
+- Por defecto se muestran **todas las filas devueltas por el SP**, incluidos lotes con stock cero o vencidos. Se añadieron búsqueda y filtros visibles de stock positivo y vencimiento; las tarjetas y exportaciones utilizan el mismo conjunto filtrado.
+- El total de unidades suma el stock de los lotes visibles; `PVF` se presenta como precio unitario de venta y no se suma como valor de inventario.
+- **Validación:** pruebas de filtros y resúmenes, consulta real con 1,478 lotes, 1,136 productos, 75,228 unidades y 42 lotes vencidos. Se verificó visualmente la vista en escritorio y móvil, incluida la combinación de stock positivo y vencidos (16 lotes). Lint, build y `git diff --check` finalizaron correctamente.
+- Estado: ✅
+
 ---
-*Última actualización: 03 de Septiembre, 2026*
+*Última actualización: 22 de Septiembre, 2026*

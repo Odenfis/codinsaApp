@@ -23,6 +23,9 @@ import {
   WalletCards,
   ReceiptText,
   ClipboardList,
+  Warehouse,
+  PackageSearch,
+  Boxes,
   ChevronDown
 } from 'lucide-react';
 
@@ -65,6 +68,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModu
       case 'WalletCards': return <WalletCards className={className} />;
       case 'ReceiptText': return <ReceiptText className={className} />;
       case 'ClipboardList': return <ClipboardList className={className} />;
+      case 'Warehouse': return <Warehouse className={className} />;
+      case 'PackageSearch': return <PackageSearch className={className} />;
+      case 'Boxes': return <Boxes className={className} />;
       default: return <FolderTree className={className} />;
     }
   };
