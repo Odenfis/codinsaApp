@@ -337,6 +337,269 @@ export interface ProductStockResponse {
   generatedAt: string;
 }
 
+export interface SalesProgressLaboratory {
+  CodLab: string;
+  Descripcion: string;
+}
+
+export interface SalesProgressRow {
+  Ruc: string;
+  Cliente: string;
+  codpro: string;
+  CodAnte: string;
+  Producto: string;
+  Cantidad: number;
+  Total: number;
+  Departamento: string;
+  Provincia: string;
+  Distrito: string;
+  Ubigeo: string;
+  Fecha: string;
+  Tipo_doc: string;
+  Serie: string;
+  nro_doc: string;
+  Vendedor: string;
+}
+
+export interface SalesProgressTotals {
+  lines: number;
+  clients: number;
+  documents: number;
+  units: number;
+  sales: number;
+}
+
+export interface SalesProgressResponse {
+  data: SalesProgressRow[];
+  total: number;
+  totals: SalesProgressTotals;
+  laboratory: SalesProgressLaboratory;
+  period: { mes: number; anio: number; desde: string; hasta: string };
+  generatedAt: string;
+}
+
+export interface PriceMarginsRow {
+  Codigo: string;
+  Producto: string;
+  Stock: number;
+  PVF: number;
+  CostoIgv: number;
+  Mas10: number;
+  Mas15: number;
+  Mas20: number;
+  Mas25: number;
+}
+
+export interface PriceMarginsTotals {
+  products: number;
+  stock: number;
+}
+
+export interface PriceMarginsResponse {
+  data: PriceMarginsRow[];
+  total: number;
+  totals: PriceMarginsTotals;
+  laboratory: SalesProgressLaboratory;
+  generatedAt: string;
+}
+
+export interface SalesRegisterRow {
+  Fecha: string;
+  FechaV: string;
+  TipoDoc: string;
+  Serie: string;
+  Numero: string;
+  Tipo: string;
+  NumeroClie: string;
+  Razon: string;
+  ValorExp: number;
+  Gravado: number;
+  Exonerado: number;
+  Inafecta: number;
+  ISC: number;
+  IGV: number;
+  Otros: number;
+  Total: number;
+  TipoCambio: number | null;
+  Feca: string | null;
+  TipoF: string;
+  SerieF: string;
+  NumDocF: string;
+  Cta12D: string;
+  Cta12H: string;
+  Cta70: string;
+  Cuenta10: string;
+  FecPago: string | null;
+  Sindato: string;
+  Glosa: string;
+}
+
+export type SalesRegisterTotals = Pick<SalesRegisterRow,
+  'ValorExp' | 'Gravado' | 'Exonerado' | 'Inafecta' | 'ISC' | 'IGV' | 'Otros' | 'Total'
+>;
+
+export interface SalesRegisterResponse {
+  data: SalesRegisterRow[];
+  total: number;
+  totals: SalesRegisterTotals;
+  period: { desde: string; hasta: string };
+  generatedAt: string;
+}
+
+export interface Salesperson {
+  Codemp: number;
+  Nombre: string;
+}
+
+export interface CustomersBySalespersonRow {
+  codclie: string;
+  Ruc: string;
+  Razon: string;
+  titular: string;
+  Direccion: string;
+  Telefono1: string;
+  Telefono2: string;
+  email: string;
+  Departamento: string;
+  Localidad: string;
+  Vendedor: string;
+  ubigeo_6d: string;
+  Limite: number;
+  TipoCliente: string;
+  RegDigemid: string;
+}
+
+export interface CustomersBySalespersonTotals {
+  clients: number;
+  located: number;
+  typeA: number;
+  typeB: number;
+  typeC: number;
+  creditLimit: number;
+}
+
+export interface CustomersBySalespersonResponse {
+  data: CustomersBySalespersonRow[];
+  total: number;
+  totals: CustomersBySalespersonTotals;
+  salesperson: Salesperson;
+  generatedAt: string;
+}
+
+export interface MonthlyQuarterlySalesRow {
+  Fecha: string;
+  Tipo: string;
+  TipoDoc: string;
+  Serie: string;
+  NroDoc: string;
+  Codigo: string;
+  Producto: string;
+  Cantidad: number;
+  Precio: number;
+  Total: number;
+  Lote: string;
+  Vencimiento: string | null;
+  Vendedor: string;
+  Zona: string;
+  Laboratorio: string;
+  RucDni: string;
+  Empresa: string;
+  Direccion: string;
+  Lugar: string;
+  Departamento: string;
+  Provincia: string;
+  Distrito: string;
+}
+
+export interface MonthlyQuarterlySalesTotals {
+  lines: number;
+  documents: number;
+  clients: number;
+  products: number;
+  units: number;
+  sales: number;
+}
+
+export interface MonthlyQuarterlySalesResponse {
+  data: MonthlyQuarterlySalesRow[];
+  total: number;
+  totals: MonthlyQuarterlySalesTotals;
+  period: { desde: string; hasta: string };
+  generatedAt: string;
+}
+
+export interface DailySalesControlRow {
+  Nro: string;
+  NomComercial: string;
+  Distrito: string;
+  RucDni: string;
+  NP: string;
+  Vendedor: string;
+  Representante: string;
+  Condicion: string;
+  Factura: string;
+  Monto: number;
+  MasIgv: number;
+  Observacion: string;
+}
+
+export interface DailySalesControlTotals {
+  invoices: number;
+  clients: number;
+  orders: number;
+  salespeople: number;
+  subtotal: number;
+  totalWithTax: number;
+}
+
+export interface DailySalesControlResponse {
+  data: DailySalesControlRow[];
+  total: number;
+  totals: DailySalesControlTotals;
+  reportDate: string;
+  generatedAt: string;
+}
+
+export interface PurchaseRegisterRow {
+  Fecha: string;
+  FechaV: string;
+  TipoDoc: string;
+  Serie: string;
+  Numero: string;
+  Tipo: string;
+  NumeroProv: string;
+  Razon: string;
+  ValorExp: number;
+  BaseImponibleM: number;
+  IGVm: number;
+  BaseImponibleG: number;
+  IGVg: number;
+  BaseImponible3: number;
+  Igv3: number;
+  Total: number;
+  NumEmitido: string;
+  NumDetraccion: string;
+  FechaDetraccion: string | null;
+  TipoCambio: number | null;
+  FecRefer: string | null;
+  TipoRef: string;
+  SerieRef: string;
+  NroComprobante: string;
+}
+
+export type PurchaseRegisterTotals = Pick<PurchaseRegisterRow,
+  'ValorExp' | 'BaseImponibleM' | 'IGVm' | 'BaseImponibleG' | 'IGVg' |
+  'BaseImponible3' | 'Igv3' | 'Total'
+>;
+
+export interface PurchaseRegisterResponse {
+  data: PurchaseRegisterRow[];
+  total: number;
+  totals: PurchaseRegisterTotals;
+  period: { desde: string; hasta: string };
+  generatedAt: string;
+}
+
 export interface PlanillaCobranzaSerie {
   Serie: string;
 }

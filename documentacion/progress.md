@@ -610,5 +610,115 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
 - **Validación:** pruebas de filtros y resúmenes, consulta real con 1,478 lotes, 1,136 productos, 75,228 unidades y 42 lotes vencidos. Se verificó visualmente la vista en escritorio y móvil, incluida la combinación de stock positivo y vencidos (16 lotes). Lint, build y `git diff --check` finalizaron correctamente.
 - Estado: ✅
 
+## 31. Reportes / Ventas / Avance de Ventas
+
+**23/09/2026** — Nuevo reporte mensual de ventas por laboratorio basado en `[dbo].[sp_Ventas_avanceCodinsa]`.
+
+- Se agregó la navegación **Reportes → Ventas → Avance de Ventas**, con ruta `/reports/sales/sales-progress` y acceso para Administrador, Auditor Senior y Gestor Operativo mediante los módulos `23` y `24`.
+- Se versionó el procedimiento proporcionado en `sql/sp_Ventas_avanceCodinsa.sql` sin modificar su consulta.
+- Nuevos endpoints autenticados:
+  - `GET /api/reportes/ventas/laboratorios` devuelve los 279 laboratorios disponibles, con códigos `CHAR(2)` normalizados y orden por descripción.
+  - `GET /api/reportes/avance-ventas?labora=...&mes=...&anio=...` valida los tres parámetros, comprueba el laboratorio y ejecuta el procedimiento con `sql.Char(2)` y `sql.Int`.
+- La API normaliza textos, fechas, cantidades e importes, conserva códigos e identificadores como texto, ordena el resultado y devuelve totales de líneas, clientes, documentos, unidades y venta.
+- La vista incorpora logo oficial, combo buscable por nombre o código, Mes/Año, generación manual, cinco KPIs, búsqueda local, tabla de 16 columnas con RUC y Cliente fijos, paginación de 20 registros y estados de carga/error/sin resultados.
+- Excel incluye logo, periodo, laboratorio, datos tipados, autofiltro, encabezados congelados y totales. PDF A3 horizontal incluye cabeceras repetidas, totales y paginación. Ambas exportaciones respetan el filtro visible.
+- Se agregaron tipos compartidos, modelo de normalización/resumen/búsqueda y pruebas unitarias para códigos con ceros iniciales, fechas, totales, unicidad, filtros, parámetros inválidos y periodos vacíos.
+- **Validación real:** laboratorio `65` (GABBLAN S.A.C.), septiembre de 2026: 17 líneas, 27 unidades y subtotal acumulado `803.108`, presentado como `S/ 803.11`. Los valores coincidieron con el resultado directo del SP. También se verificó la interfaz en móvil y escritorio.
+- **Validación técnica:** pruebas unitarias, TypeScript, build y `git diff --check` finalizaron correctamente; permanece únicamente la advertencia informativa existente sobre tamaño del bundle.
+- Estado: ✅
+
+## 32. Reportes / Ventas / Precios con Márgenes
+
+**24/09/2026** — Nuevo reporte de precios, costos y márgenes por laboratorio basado en `[dbo].[sp_Productos_PrecionMargenes]`.
+
+- Se agregó **Reportes → Ventas → Precios con Márgenes**, con ruta `/reports/sales/prices-margins` y acceso para Administrador, Auditor Senior y Gestor Operativo mediante el módulo `25`.
+- Se versionó el procedimiento proporcionado en `sql/sp_Productos_PrecionMargenes.sql`, conservando su nombre y sus cálculos de PVF, costo con IGV y precios con incrementos de 10%, 15%, 20% y 25%.
+- El endpoint autenticado `GET /api/reportes/precios-margenes?labora=...` valida el código `CHAR(2)`, comprueba el laboratorio, ejecuta el SP, normaliza los resultados, totaliza productos y stock y registra auditoría.
+- La vista reutiliza el catálogo buscable de laboratorios de Ventas e incluye generación manual, búsqueda por código o producto, dos indicadores, tabla responsive de nueve columnas y paginación de 20 productos.
+- Excel y PDF incluyen logo, laboratorio, fecha de generación, importes formateados y total de stock; ambas exportaciones respetan la búsqueda visible.
+- Se agregaron tipos, modelo de filtrado/resumen y pruebas unitarias para validación, normalización, ordenamiento, valores inválidos, búsqueda sin tildes y resultados vacíos.
+- **Validación real:** el laboratorio `65` (GABBLAN S.A.C.) devolvió 74 productos y 6,525 unidades; los códigos, stock, PVF, costo con IGV y cuatro precios con margen coincidieron con la salida del SP. También se comprobaron las respuestas HTTP 400 para laboratorio faltante e inexistente y la interfaz completa en escritorio y móvil.
+- **Validación técnica:** las 15 pruebas unitarias del proyecto, TypeScript, build de producción y `git diff --check` finalizaron correctamente; permanece únicamente la advertencia informativa existente sobre tamaño del bundle.
+- Estado: ✅
+
+## 33. Reportes / Ventas / Registro de Ventas
+
+**25/09/2026** — Nuevo registro contable de ventas por rango de fechas basado en `[dbo].[sp_ventas_registroVentas]`.
+
+- Se agregó **Reportes → Ventas → Registro de Ventas**, con ruta `/reports/sales/sales-register` y acceso para Administrador, Auditor Senior y Gestor Operativo mediante el módulo `26`.
+- Se versionó el procedimiento proporcionado en `sql/sp_ventas_registroVentas.sql`, limpiando únicamente los artefactos de formato del texto original y conservando su lógica contable.
+- El endpoint autenticado `GET /api/reportes/registro-ventas?desde=...&hasta=...` valida fechas ISO reales y el orden del rango, ejecuta el SP con parámetros `SmallDateTime` y consulta posteriormente `t_registroVentas`.
+- La ejecución y lectura se realizan en una transacción `SERIALIZABLE` protegida con `sp_getapplock`, evitando que solicitudes concurrentes con rangos diferentes mezclen el contenido de la tabla compartida.
+- La API normaliza las 28 columnas, conserva códigos y cuentas como texto, ordena los comprobantes, calcula ocho totales contables, desactiva caché y registra la generación en auditoría.
+- La vista incluye rango Del/Al, búsqueda por documento, cliente o glosa, cinco indicadores, las 28 columnas con identificadores fijos, scroll horizontal, paginación de 20 registros y estados de carga/error/sin resultados.
+- Excel y PDF A3 horizontal incluyen logo, rango, fecha de generación, todas las columnas, totales, encabezados repetidos y paginación; ambos respetan la búsqueda visible.
+- Se agregaron tipos, modelo de filtrado/resumen y pruebas unitarias para fechas inválidas, normalización, códigos con ceros iniciales, importes negativos, ordenamiento, búsqueda y resultados vacíos.
+- **Corrección de generación:** el SP original convertía fechas a texto `dd/MM/yyyy` y después a `datetime` sin especificar estilo, lo que producía el error SQL 242 en sesiones configuradas como `mdy`. La llamada ahora establece `DATEFORMAT dmy` por compatibilidad inmediata y el SQL versionado compara valores `date` directamente, eliminando la conversión ambigua.
+- **Ajuste visual:** la cabecera usa el mismo logo recortado, ancho responsive, separador vertical, espaciado y comportamiento de botones que Avance de Ventas y Precios con Márgenes.
+- **Validación técnica:** las 20 pruebas unitarias, TypeScript, build de producción y `git diff --check` finalizaron correctamente; la validación funcional contra SQL Server y la prueba concurrente quedan pendientes porque la instancia configurada en `localhost:1433` no estuvo disponible.
+- Estado: ✅
+
+## 34. Reportes / Ventas / Reportes de Clientes por Vendedor
+
+**25/09/2026** — Nuevo reporte de cartera de clientes asignada a vendedores basado en `[dbo].[sp_Clientes_xVendedor]`.
+
+- Se agregó **Reportes → Ventas → Reportes de Clientes por Vendedor**, con ruta `/reports/sales/customers-by-salesperson` y acceso para Administrador, Auditor Senior y Gestor Operativo mediante el módulo `27`.
+- Se versionó el procedimiento proporcionado en `sql/sp_Clientes_xVendedor.sql`, limpiando únicamente los artefactos HTML/Markdown y conservando su clasificación de clientes y relaciones de ubicación.
+- El endpoint autenticado `GET /api/reportes/ventas/vendedores` devuelve exclusivamente empleados con `Tipo = 3`, ordenados por nombre y código.
+- El endpoint autenticado `GET /api/reportes/clientes-vendedor?vende=...` valida un entero positivo, vuelve a comprobar que el empleado sea vendedor, ejecuta el SP con `sql.Int`, normaliza las 15 columnas y registra auditoría.
+- La respuesta incluye vendedor, fecha de generación y resúmenes de clientes, clientes con UBIGEO, tipos A/B/C y límite de crédito acumulado.
+- La vista mantiene el estándar visual de Ventas: logo recortado, combo buscable por código o nombre, generación manual, búsqueda local, seis indicadores, tabla responsive con tres columnas fijas y paginación de 20 clientes.
+- Excel y PDF A3 horizontal incluyen las 15 columnas, vendedor, logo, fecha de generación, clasificación, límite total, encabezados repetidos y paginación; ambas exportaciones respetan la búsqueda visible.
+- Se agregaron tipos, modelo y pruebas unitarias para parámetros inválidos, normalización, ordenamiento, clasificación, UBIGEO, límites, búsqueda sin tildes y resultados vacíos.
+- **Validación técnica:** las 25 pruebas unitarias y TypeScript finalizaron correctamente. La ejecución real contra SQL Server queda pendiente porque la instancia configurada en `localhost:1433` no está accesible desde el entorno de herramientas.
+- Estado: ✅
+
+## 35. Reportes / Ventas / Ventas Mensuales o Trimestrales
+
+**25/09/2026** — Nuevo reporte detallado de ventas por rango basado en `[dbo].[sp_Ventas_DelAl_codinsa]`.
+
+- Se agregó **Reportes → Ventas → Ventas Mensuales o Trimestrales**, con ruta `/reports/sales/monthly-quarterly-sales` y acceso para Administrador, Auditor Senior y Gestor Operativo mediante el módulo `28`.
+- Se versionó el procedimiento proporcionado en `sql/sp_Ventas_DelAl_codinsa.sql`, limpiando artefactos HTML/Markdown y reemplazando la conversión ambigua de fechas por comparaciones `date`.
+- El endpoint autenticado `GET /api/reportes/ventas-mensuales-trimestrales?desde=...&hasta=...` valida fechas ISO reales, ejecuta el SP con `SmallDateTime` y `DATEFORMAT dmy`, normaliza 22 columnas y registra auditoría.
+- La vista ofrece rango Del/Al libre y atajos para Mes actual, Mes anterior y Trimestre actual; incluye búsqueda, seis indicadores, tabla responsive con columnas identificadoras fijas y paginación de 20 líneas.
+- Los indicadores y exportaciones se recalculan sobre el filtro visible: líneas, documentos, clientes y productos únicos, unidades y venta total.
+- Excel y PDF A3 horizontal incluyen logo, rango, fecha de generación, las 22 columnas, datos tipados, totales, encabezados repetidos y paginación horizontal cuando es necesaria.
+- Se agregaron tipos, modelo y pruebas unitarias para fechas inválidas, normalización case-insensitive, vencimientos nulos, códigos, importes negativos, ordenamiento, búsqueda, totales, periodos vacíos y los tres atajos.
+- **Validación técnica:** las 31 pruebas unitarias y TypeScript finalizaron correctamente. La ejecución real contra SQL Server queda pendiente porque la instancia configurada en `localhost:1433` no está accesible desde el entorno de herramientas.
+- Estado: ✅
+
+## 36. Reportes / Ventas / Control Diario
+
+**25/09/2026** — Nuevo reporte operativo de ventas del día basado en `[dbo].[sp_Ventas_ControlDia]`.
+
+- Se agregó **Reportes → Ventas → Control Diario**, con ruta `/reports/sales/daily-control` y acceso para Administrador, Auditor Senior y Gestor Operativo mediante el módulo `29`.
+- Se versionó el procedimiento proporcionado en `sql/sp_Ventas_ControlDia.sql`, limpiando los artefactos HTML/Markdown y reemplazando la conversión ambigua de texto por una comparación de valores `date`.
+- El endpoint autenticado `GET /api/reportes/control-diario` no requiere ni admite parámetros. Ejecuta el SP con `DATEFORMAT dmy`, obtiene la fecha operativa de SQL Server en el mismo batch, desactiva caché y registra la consulta en auditoría.
+- La API normaliza las 12 columnas sin depender de mayúsculas, conserva códigos, documentos, pedidos y facturas como texto, admite los campos opcionales de los `LEFT JOIN`, ordena el resultado y calcula seis indicadores.
+- La vista carga automáticamente al abrirse y solo vuelve a consultar mediante **Actualizar reporte**. Muestra la fecha operativa de SQL Server, la hora de generación, búsqueda sin tildes, seis indicadores, tabla responsive con dos columnas fijas y paginación de 20 registros.
+- Los indicadores y exportaciones se recalculan sobre el filtro visible: facturas, clientes, pedidos y vendedores únicos, subtotal y total con IGV.
+- Excel y PDF A3 horizontal incluyen logo, fecha operativa, generación, las 12 columnas, totales, encabezados repetidos y paginación; ambos conservan únicamente las filas visibles por el filtro.
+- Se agregaron tipos, modelo y pruebas unitarias para normalización case-insensitive, nulos, ceros iniciales, importes inválidos y negativos, ordenamiento, búsqueda sin tildes, conteos únicos, sumas y respuesta vacía.
+- **Validación real:** la ejecución directa del SP devolvió la fecha operativa `25/09/2026`, dos recordsets y cero ventas para el día; la respuesta conservó la fecha y produjo correctamente los seis totales en cero.
+- **Validación técnica:** las 35 pruebas unitarias, TypeScript, lint, build de producción y `git diff --check` finalizaron correctamente; permanece únicamente la advertencia informativa existente sobre tamaño del bundle.
+- Estado: ✅
+
+## 37. Reportes / Compras / Registro de Compras
+
+**25/09/2026** — Nuevo registro tributario de compras por rango basado en `[dbo].[sp_compras_registroCompras]`.
+
+- Se agregó el módulo padre **Reportes → Compras** y su reporte **Registro de Compras**, con rutas `/reports/purchases` y `/reports/purchases/purchase-register`, y acceso para Administrador, Auditor Senior y Gestor Operativo mediante los módulos `30` y `31`.
+- Se versionó el procedimiento proporcionado en `sql/sp_compras_registroCompras.sql`, conservando sus reglas contables y reemplazando las conversiones ambiguas de texto por comparaciones directas de valores `date`.
+- El endpoint autenticado `GET /api/reportes/registro-compras?desde=...&hasta=...` valida fechas ISO reales y el orden del rango, ejecuta el SP con parámetros `SmallDateTime` y consulta posteriormente las 24 columnas de `t_RegistroCompras`.
+- La ejecución y lectura usan una transacción `SERIALIZABLE` y `sp_getapplock` exclusivo con el recurso `CODINSA_REGISTRO_COMPRAS`, evitando que dos periodos simultáneos mezclen el contenido de la tabla compartida.
+- La API normaliza las 24 columnas sin depender de mayúsculas, conserva códigos y documentos como texto, admite fechas y referencias nulas, ordena los comprobantes y calcula ocho totales tributarios.
+- Se corrigió específicamente la interpretación de fechas SQL como UTC para impedir que una fecha almacenada cambie al día anterior al presentarse en la zona horaria de Lima.
+- La vista mantiene el diseño corporativo: logo recortado, rango Del/Al, generación manual, búsqueda sin tildes, seis indicadores, tabla con cinco columnas fijas, scroll horizontal, paginación de 20 registros y estados de carga/error/sin resultados.
+- Excel y PDF A3 horizontal incluyen logo, periodo, fecha de generación, las 24 columnas, totales, encabezados repetidos y paginación; ambos utilizan el conjunto filtrado visible.
+- Se agregaron tipos, modelo y pruebas unitarias para fechas inválidas, normalización case-insensitive, nulos, ceros iniciales, importes inválidos y negativos, ordenamiento, búsqueda, totales y resultados vacíos.
+- **Validación real:** el rango del 20 al 21 de julio de 2026 devolvió 2 comprobantes y un total de `S/ 3,004.62`. Una ejecución concurrente contra un periodo vacío produjo respectivamente 2 y 0 filas, sin cruces; ambas transacciones se revirtieron y `t_RegistroCompras` conservó sus 2 filas previas.
+- **Validación técnica:** las 40 pruebas unitarias, TypeScript, lint, build de producción y `git diff --check` finalizaron correctamente; permanece únicamente la advertencia informativa existente sobre tamaño del bundle.
+- Estado: ✅
+
 ---
-*Última actualización: 22 de Septiembre, 2026*
+*Última actualización: 25 de Septiembre, 2026*

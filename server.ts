@@ -22,6 +22,13 @@ import { getNisiraCount, exportNisiraToDbf, runNisiraSp, exportNisiraToDbfDirect
 import { NisiraExportConfigManager } from './src/backend/nisiraConfig';
 import { ErpUpdateConfigManager } from './src/backend/erpUpdateConfig';
 import { buildValuedStockReport } from './src/backend/services/valuedStockReport';
+import { buildSalesProgressReport, parseSalesProgressParameters } from './src/backend/services/salesProgressReport';
+import { buildPriceMarginsReport, parsePriceMarginsParameters } from './src/backend/services/priceMarginsReport';
+import { buildSalesRegisterReport, parseSalesRegisterParameters } from './src/backend/services/salesRegisterReport';
+import { buildCustomersBySalespersonReport, parseCustomersBySalespersonParameters } from './src/backend/services/customersBySalespersonReport';
+import { buildMonthlyQuarterlySalesReport, parseMonthlyQuarterlySalesParameters } from './src/backend/services/monthlyQuarterlySalesReport';
+import { buildDailySalesControlReport } from './src/backend/services/dailySalesControlReport';
+import { buildPurchaseRegisterReport, parsePurchaseRegisterParameters } from './src/backend/services/purchaseRegisterReport';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -708,6 +715,322 @@ app.get('/api/reportes/stock-productos', authMiddleware, async (req: Authenticat
   } catch (err) {
     console.error('[STOCK PRODUCTOS ERROR]', err);
     return res.status(500).json({ error: 'No se pudo obtener el Stock de Productos. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/ventas/laboratorios', authMiddleware, async (_req: Request, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request().query(`
+      SELECT RTRIM(CodLab) AS CodLab, RTRIM(Descripcion) AS Descripcion
+      FROM Laboratorios
+      ORDER BY Descripcion, CodLab
+    `);
+    return res.json({ data: result.recordset });
+  } catch (err) {
+    console.error('[AVANCE VENTAS LABORATORIOS ERROR]', err);
+    return res.status(500).json({ error: 'No se pudieron cargar los laboratorios.' });
+  }
+});
+
+app.get('/api/reportes/ventas/vendedores', authMiddleware, async (_req: Request, res: Response) => {
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request().query(`
+      SELECT Codemp, RTRIM(Nombre) AS Nombre
+      FROM Empleados
+      WHERE Tipo = 3
+      ORDER BY Nombre, Codemp
+    `);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ data: result.recordset });
+  } catch (err) {
+    console.error('[VENDEDORES REPORTE ERROR]', err);
+    return res.status(500).json({ error: 'No se pudieron cargar los vendedores.' });
+  }
+});
+
+app.get('/api/reportes/avance-ventas', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const parameters = parseSalesProgressParameters(req.query.labora, req.query.mes, req.query.anio);
+  if (parameters.error) return res.status(400).json({ error: parameters.error });
+  const { labora, mes, anio } = parameters.value;
+
+  try {
+    const pool = await getDbPool();
+    const laboratoryResult = await pool.request()
+      .input('labora', sql.Char(2), labora)
+      .query(`
+        SELECT TOP (1) RTRIM(CodLab) AS CodLab, RTRIM(Descripcion) AS Descripcion
+        FROM Laboratorios
+        WHERE CodLab = @labora
+      `);
+    if (!laboratoryResult.recordset.length) {
+      return res.status(400).json({ error: 'El laboratorio seleccionado no existe.' });
+    }
+
+    const result = await pool.request()
+      .input('labora', sql.Char(2), labora)
+      .input('mes', sql.Int, mes)
+      .input('anio', sql.Int, anio)
+      .execute('sp_Ventas_avanceCodinsa');
+    const report = buildSalesProgressReport(result.recordset, laboratoryResult.recordset[0], mes, anio);
+
+    res.setHeader('Cache-Control', 'no-store');
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Avance de Ventas ${labora} ${String(mes).padStart(2, '0')}/${anio} (${report.total} registros)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    console.error('[AVANCE VENTAS ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el Avance de Ventas. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/precios-margenes', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const parameters = parsePriceMarginsParameters(req.query.labora);
+  if (parameters.error) return res.status(400).json({ error: parameters.error });
+  const { labora } = parameters.value;
+
+  try {
+    const pool = await getDbPool();
+    const laboratoryResult = await pool.request()
+      .input('labora', sql.Char(2), labora)
+      .query(`
+        SELECT TOP (1) RTRIM(CodLab) AS CodLab, RTRIM(Descripcion) AS Descripcion
+        FROM Laboratorios
+        WHERE CodLab = @labora
+      `);
+    if (!laboratoryResult.recordset.length) {
+      return res.status(400).json({ error: 'El laboratorio seleccionado no existe.' });
+    }
+
+    const result = await pool.request()
+      .input('labora', sql.Char(2), labora)
+      .execute('sp_Productos_PrecionMargenes');
+    const report = buildPriceMarginsReport(result.recordset, laboratoryResult.recordset[0]);
+
+    res.setHeader('Cache-Control', 'no-store');
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Precios con Márgenes ${labora} (${report.total} productos)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    console.error('[PRECIOS MARGENES ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el reporte de Precios con Márgenes. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/registro-ventas', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const parameters = parseSalesRegisterParameters(req.query.desde, req.query.hasta);
+  if (parameters.error) return res.status(400).json({ error: parameters.error });
+  const { desde, hasta, fromDate, toDate } = parameters.value;
+
+  try {
+    const pool = await getDbPool();
+    const transaction = new sql.Transaction(pool);
+    let report;
+    try {
+      await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+      const request = new sql.Request(transaction);
+      (request as sql.Request & { timeout: number }).timeout = 300000;
+      const result = await request
+        .input('fec1', sql.SmallDateTime, fromDate)
+        .input('fec2', sql.SmallDateTime, toDate)
+        .query(`
+          DECLARE @lockResult INT;
+          EXEC @lockResult = sys.sp_getapplock
+            @Resource = 'CODINSA_REGISTRO_VENTAS',
+            @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction',
+            @LockTimeout = 30000;
+          IF @lockResult < 0
+            THROW 51002, 'No se pudo reservar la generación del Registro de Ventas. Inténtelo nuevamente.', 1;
+
+          SET DATEFORMAT dmy;
+          EXEC [dbo].[sp_ventas_registroVentas] @fec1 = @fec1, @fec2 = @fec2;
+
+          SELECT *
+          FROM [dbo].[t_registroVentas];
+        `);
+      report = buildSalesRegisterReport(result.recordset as Record<string, unknown>[], desde, hasta);
+      await transaction.commit();
+    } catch (transactionError) {
+      try { await transaction.rollback(); } catch { /* SQL Server puede haber cerrado la transacción. */ }
+      throw transactionError;
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Registro de Ventas ${desde} al ${hasta} (${report.total} registros)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    console.error('[REGISTRO VENTAS ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el Registro de Ventas. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/clientes-vendedor', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const parameters = parseCustomersBySalespersonParameters(req.query.vende);
+  if (parameters.error) return res.status(400).json({ error: parameters.error });
+  const { vende } = parameters.value;
+
+  try {
+    const pool = await getDbPool();
+    const salespersonResult = await pool.request()
+      .input('vende', sql.Int, vende)
+      .query(`
+        SELECT TOP (1) Codemp, RTRIM(Nombre) AS Nombre
+        FROM Empleados
+        WHERE Codemp = @vende AND Tipo = 3
+      `);
+    if (!salespersonResult.recordset.length) {
+      return res.status(400).json({ error: 'El empleado seleccionado no existe o no es un vendedor.' });
+    }
+
+    const result = await pool.request()
+      .input('vende', sql.Int, vende)
+      .execute('sp_Clientes_xVendedor');
+    const report = buildCustomersBySalespersonReport(result.recordset, salespersonResult.recordset[0]);
+
+    res.setHeader('Cache-Control', 'no-store');
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Clientes por Vendedor ${vende} - ${report.salesperson.Nombre} (${report.total} clientes)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    console.error('[CLIENTES POR VENDEDOR ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el reporte de Clientes por Vendedor. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/ventas-mensuales-trimestrales', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const parameters = parseMonthlyQuarterlySalesParameters(req.query.desde, req.query.hasta);
+  if (parameters.error) return res.status(400).json({ error: parameters.error });
+  const { desde, hasta, fromDate, toDate } = parameters.value;
+
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request()
+      .input('fec1', sql.SmallDateTime, fromDate)
+      .input('fec2', sql.SmallDateTime, toDate)
+      .query(`
+        SET DATEFORMAT dmy;
+        EXEC [dbo].[sp_Ventas_DelAl_codinsa] @fec1 = @fec1, @fec2 = @fec2;
+      `);
+    const report = buildMonthlyQuarterlySalesReport(result.recordset, desde, hasta);
+
+    res.setHeader('Cache-Control', 'no-store');
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Ventas Mensuales o Trimestrales ${desde} al ${hasta} (${report.total} líneas)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    console.error('[VENTAS MENSUALES TRIMESTRALES ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el reporte de Ventas Mensuales o Trimestrales. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/control-diario', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  if (Object.keys(req.query).length > 0) {
+    return res.status(400).json({ error: 'Control Diario no admite parámetros; utiliza la fecha actual de SQL Server.' });
+  }
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request().query(`
+      SET NOCOUNT ON;
+      SET DATEFORMAT dmy;
+      EXEC [dbo].[sp_Ventas_ControlDia];
+      SELECT CONVERT(char(10), GETDATE(), 23) AS ReportDate;
+    `);
+    const recordsets = result.recordsets as unknown as Array<Array<Record<string, unknown>>>;
+    const data = recordsets[0] || [];
+    const reportDate = recordsets[1]?.[0]?.ReportDate;
+    const report = buildDailySalesControlReport(data, reportDate);
+
+    res.setHeader('Cache-Control', 'no-store');
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Consultó Control Diario ${report.reportDate} (${report.total} registros)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    console.error('[CONTROL DIARIO ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo obtener el Control Diario. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/registro-compras', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const parameters = parsePurchaseRegisterParameters(req.query.desde, req.query.hasta);
+  if (parameters.error) return res.status(400).json({ error: parameters.error });
+  const { desde, hasta, fromDate, toDate } = parameters.value;
+
+  try {
+    const pool = await getDbPool();
+    const transaction = new sql.Transaction(pool);
+    let report;
+    try {
+      await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+      const request = new sql.Request(transaction);
+      (request as sql.Request & { timeout: number }).timeout = 300000;
+      const result = await request
+        .input('fec1', sql.SmallDateTime, fromDate)
+        .input('fec2', sql.SmallDateTime, toDate)
+        .query(`
+          DECLARE @lockResult INT;
+          EXEC @lockResult = sys.sp_getapplock
+            @Resource = 'CODINSA_REGISTRO_COMPRAS',
+            @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction',
+            @LockTimeout = 30000;
+          IF @lockResult < 0
+            THROW 51003, 'No se pudo reservar la generación del Registro de Compras. Inténtelo nuevamente.', 1;
+
+          SET NOCOUNT ON;
+          SET DATEFORMAT dmy;
+          EXEC [dbo].[sp_compras_registroCompras] @fec1 = @fec1, @fec2 = @fec2;
+
+          SELECT Fecha, FechaV, TipoDoc, Serie, Numero, Tipo, NumeroProv, Razon, ValorExp,
+            BaseImponibleM, IGVm, BaseImponibleG, IGVg, BaseImponible3, Igv3, Total,
+            NumEmitido, NumDetraccion, FechaDetraccion, tipoCambio, FecRefer, TipoRef,
+            SerieRef, NroComprobante
+          FROM [dbo].[t_RegistroCompras];
+        `);
+      report = buildPurchaseRegisterReport(result.recordset as Record<string, unknown>[], desde, hasta);
+      await transaction.commit();
+    } catch (transactionError) {
+      try { await transaction.rollback(); } catch { /* SQL Server puede haber cerrado la transacción. */ }
+      throw transactionError;
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Registro de Compras ${desde} al ${hasta} (${report.total} registros)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    console.error('[REGISTRO COMPRAS ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el Registro de Compras. Inténtelo nuevamente.' });
   }
 });
 

@@ -31,6 +31,17 @@ class EnterpriseDatabase {
         { id_modulo: 20, nombre_modulo: 'Kardex de Productos', icono: 'PackageSearch', ruta: '/reports/warehouse/product-kardex', orden: 1, estado: true },
         { id_modulo: 21, nombre_modulo: 'Stock Valorizado', icono: 'Boxes', ruta: '/reports/warehouse/valued-stock', orden: 2, estado: true },
         { id_modulo: 22, nombre_modulo: 'Stock de Productos', icono: 'Package', ruta: '/reports/warehouse/product-stock', orden: 3, estado: true }
+      ] },
+      { id_modulo: 23, nombre_modulo: 'Ventas', icono: 'ShoppingCart', ruta: '/reports/sales', orden: 3, estado: true, children: [
+        { id_modulo: 24, nombre_modulo: 'Avance de Ventas', icono: 'TrendingUp', ruta: '/reports/sales/sales-progress', orden: 1, estado: true },
+        { id_modulo: 25, nombre_modulo: 'Precios con Márgenes', icono: 'Percent', ruta: '/reports/sales/prices-margins', orden: 2, estado: true },
+        { id_modulo: 26, nombre_modulo: 'Registro de Ventas', icono: 'ReceiptText', ruta: '/reports/sales/sales-register', orden: 3, estado: true },
+        { id_modulo: 27, nombre_modulo: 'Reportes de Clientes por Vendedor', icono: 'Users', ruta: '/reports/sales/customers-by-salesperson', orden: 4, estado: true },
+        { id_modulo: 28, nombre_modulo: 'Ventas Mensuales o Trimestrales', icono: 'CalendarRange', ruta: '/reports/sales/monthly-quarterly-sales', orden: 5, estado: true },
+        { id_modulo: 29, nombre_modulo: 'Control Diario', icono: 'ClipboardCheck', ruta: '/reports/sales/daily-control', orden: 6, estado: true }
+      ] },
+      { id_modulo: 30, nombre_modulo: 'Compras', icono: 'ShoppingBag', ruta: '/reports/purchases', orden: 4, estado: true, children: [
+        { id_modulo: 31, nombre_modulo: 'Registro de Compras', icono: 'ReceiptText', ruta: '/reports/purchases/purchase-register', orden: 1, estado: true }
       ] }
     ] },
     { id_modulo: 3, nombre_modulo: 'Providers', icono: 'Network', ruta: '/providers', orden: 5, estado: false },
@@ -45,9 +56,9 @@ class EnterpriseDatabase {
   ];
 
   public rolesModulos: Record<number, number[]> = {
-    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22],
-    2: [1, 2, 3, 5, 7, 16, 17, 18, 19, 20, 21, 22],
-    3: [1, 2, 3, 5, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22]
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
+    2: [1, 2, 3, 5, 7, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
+    3: [1, 2, 3, 5, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
   };
 
   public usuarios: Usuario[] = [

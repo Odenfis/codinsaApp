@@ -26,6 +26,12 @@ import {
   Warehouse,
   PackageSearch,
   Boxes,
+  ShoppingCart,
+  ShoppingBag,
+  TrendingUp,
+  Percent,
+  CalendarRange,
+  ClipboardCheck,
   ChevronDown
 } from 'lucide-react';
 
@@ -71,6 +77,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModu
       case 'Warehouse': return <Warehouse className={className} />;
       case 'PackageSearch': return <PackageSearch className={className} />;
       case 'Boxes': return <Boxes className={className} />;
+      case 'ShoppingCart': return <ShoppingCart className={className} />;
+      case 'ShoppingBag': return <ShoppingBag className={className} />;
+      case 'TrendingUp': return <TrendingUp className={className} />;
+      case 'Percent': return <Percent className={className} />;
+      case 'CalendarRange': return <CalendarRange className={className} />;
+      case 'ClipboardCheck': return <ClipboardCheck className={className} />;
       default: return <FolderTree className={className} />;
     }
   };
