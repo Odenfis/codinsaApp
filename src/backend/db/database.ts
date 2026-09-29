@@ -25,7 +25,8 @@ class EnterpriseDatabase {
     { id_modulo: 5, nombre_modulo: 'Reportes', icono: 'BarChart3', ruta: '/reports', orden: 4, estado: true, children: [
       { id_modulo: 16, nombre_modulo: 'Cuentas', icono: 'WalletCards', ruta: '/reports/accounts', orden: 1, estado: true, children: [
         { id_modulo: 17, nombre_modulo: 'Reporte de Cobranzas', icono: 'ReceiptText', ruta: '/reports/accounts/collections', orden: 1, estado: true },
-        { id_modulo: 18, nombre_modulo: 'Planilla Cobranza', icono: 'ClipboardList', ruta: '/reports/accounts/collection-sheet', orden: 2, estado: true }
+        { id_modulo: 18, nombre_modulo: 'Planilla Cobranza', icono: 'ClipboardList', ruta: '/reports/accounts/collection-sheet', orden: 2, estado: true },
+        { id_modulo: 32, nombre_modulo: 'Historial del Cliente', icono: 'FileClock', ruta: '/reports/accounts/customer-history', orden: 3, estado: true }
       ] },
       { id_modulo: 19, nombre_modulo: 'Almacén', icono: 'Warehouse', ruta: '/reports/warehouse', orden: 2, estado: true, children: [
         { id_modulo: 20, nombre_modulo: 'Kardex de Productos', icono: 'PackageSearch', ruta: '/reports/warehouse/product-kardex', orden: 1, estado: true },
@@ -56,9 +57,9 @@ class EnterpriseDatabase {
   ];
 
   public rolesModulos: Record<number, number[]> = {
-    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
-    2: [1, 2, 3, 5, 7, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
-    3: [1, 2, 3, 5, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32],
+    2: [1, 2, 3, 5, 7, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32],
+    3: [1, 2, 3, 5, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
   };
 
   public usuarios: Usuario[] = [

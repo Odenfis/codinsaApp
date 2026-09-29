@@ -32,6 +32,7 @@ import {
   Percent,
   CalendarRange,
   ClipboardCheck,
+  FileClock,
   ChevronDown
 } from 'lucide-react';
 
@@ -83,6 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModulePath, onSelectModu
       case 'Percent': return <Percent className={className} />;
       case 'CalendarRange': return <CalendarRange className={className} />;
       case 'ClipboardCheck': return <ClipboardCheck className={className} />;
+      case 'FileClock': return <FileClock className={className} />;
       default: return <FolderTree className={className} />;
     }
   };

@@ -16,6 +16,7 @@ import { UsersView } from './components/modules/UsersView';
 import { ReportsView } from './components/modules/ReportsView';
 import { CollectionsReportView } from './components/modules/CollectionsReportView';
 import { CollectionSheetView } from './components/modules/CollectionSheetView';
+import { CustomerHistoryReportView } from './components/modules/CustomerHistoryReportView';
 import { ProductKardexReportView } from './components/modules/ProductKardexReportView';
 import { ValuedStockReportView } from './components/modules/ValuedStockReportView';
 import { ProductStockReportView } from './components/modules/ProductStockReportView';
@@ -67,6 +68,7 @@ const MainLayout: React.FC = () => {
       case '/reports/accounts': return <CollectionsReportView />;
       case '/reports/accounts/collections': return <CollectionsReportView />;
       case '/reports/accounts/collection-sheet': return <CollectionSheetView />;
+      case '/reports/accounts/customer-history': return <CustomerHistoryReportView />;
       case '/reports/warehouse': return <ProductKardexReportView />;
       case '/reports/warehouse/product-kardex': return <ProductKardexReportView />;
       case '/reports/warehouse/valued-stock': return <ValuedStockReportView />;

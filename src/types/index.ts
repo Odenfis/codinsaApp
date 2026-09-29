@@ -665,6 +665,41 @@ export interface PlanillaCobranzaResponse {
   totals: PlanillaCobranzaTotals;
 }
 
+export interface CustomerHistoryClient {
+  Codclie: number;
+  Ruc: string;
+  Razon: string;
+  Activo: boolean;
+}
+
+export interface CustomerHistoryRow {
+  Nro: number;
+  Item: number;
+  Vendedor: number;
+  Documento: string;
+  Numero: string;
+  Fecha: string | null;
+  Importe: number;
+  Amortizado: number;
+  FechaV: string | null;
+  Saldo: number;
+  Situacion: string;
+}
+
+export interface CustomerHistoryTotals {
+  documents: number;
+  importe: number;
+  amortizado: number;
+  saldo: number;
+}
+
+export interface CustomerHistoryResponse {
+  client: CustomerHistoryClient;
+  data: CustomerHistoryRow[];
+  totals: CustomerHistoryTotals;
+  generatedAt: string;
+}
+
 export interface ApiRucResponse {
   success: boolean;
   datos: {

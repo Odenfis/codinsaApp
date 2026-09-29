@@ -29,6 +29,7 @@ import { buildCustomersBySalespersonReport, parseCustomersBySalespersonParameter
 import { buildMonthlyQuarterlySalesReport, parseMonthlyQuarterlySalesParameters } from './src/backend/services/monthlyQuarterlySalesReport';
 import { buildDailySalesControlReport } from './src/backend/services/dailySalesControlReport';
 import { buildPurchaseRegisterReport, parsePurchaseRegisterParameters } from './src/backend/services/purchaseRegisterReport';
+import { buildCustomerHistoryReport, parseCustomerHistoryCustomerId } from './src/backend/services/customerHistoryReport';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -533,6 +534,130 @@ app.get('/api/reportes/planilla-cobranza', authMiddleware, async (req: Request, 
   } catch (err) {
     console.error('[PLANILLA COBRANZA ERROR]', err);
     return res.status(500).json({ error: 'No se pudo generar la planilla de cobranza. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/historial-cliente/clientes', authMiddleware, async (req: Request, res: Response) => {
+  const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+  if (search.length > 80) {
+    return res.status(400).json({ error: 'La búsqueda no puede exceder 80 caracteres.' });
+  }
+
+  try {
+    const pool = await getDbPool();
+    const result = await pool.request()
+      .input('search', sql.NVarChar(82), `%${search}%`)
+      .query(`
+        SELECT TOP (50)
+          c.Codclie,
+          LTRIM(RTRIM(c.Documento)) AS Ruc,
+          LTRIM(RTRIM(c.Razon)) AS Razon,
+          CAST(COALESCE(c.Activo, 0) AS bit) AS Activo
+        FROM dbo.Clientes c
+        WHERE RTRIM(c.tipoDoc) = 'R'
+          AND LEN(LTRIM(RTRIM(c.Documento))) = 11
+          AND LTRIM(RTRIM(c.Documento)) NOT LIKE '%[^0-9]%'
+          AND (
+            @search = '%%'
+            OR c.Documento LIKE @search
+            OR c.Razon COLLATE Latin1_General_100_CI_AI LIKE @search COLLATE Latin1_General_100_CI_AI
+          )
+        ORDER BY c.Razon, c.Documento
+      `);
+    return res.json({ data: result.recordset });
+  } catch (err) {
+    console.error('[HISTORIAL CLIENTE SELECTOR ERROR]', err);
+    return res.status(500).json({ error: 'No se pudieron cargar los clientes con RUC.' });
+  }
+});
+
+app.post('/api/reportes/historial-cliente', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = parseCustomerHistoryCustomerId(req.body?.codclie);
+  if (parsed.error) return res.status(400).json({ error: parsed.error });
+
+  let transaction: sql.Transaction | null = null;
+  let transactionOpen = false;
+  const timedRequest = (parent: sql.Transaction) =>
+    new (sql.Request as any)(parent, { requestTimeout: 120_000 }) as sql.Request;
+
+  try {
+    const pool = await getDbPool();
+    transaction = new sql.Transaction(pool);
+    await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+    transactionOpen = true;
+
+    const lockRequest = timedRequest(transaction);
+    await lockRequest.query(`
+      DECLARE @lockResult int;
+      EXEC @lockResult = sys.sp_getapplock
+        @Resource = 'CODINSA_HISTORIAL_CLIENTE',
+        @LockMode = 'Exclusive',
+        @LockOwner = 'Transaction',
+        @LockTimeout = 120000;
+      IF @lockResult < 0
+        THROW 51000, 'No se pudo reservar la generación del historial del cliente.', 1;
+    `);
+
+    const customerRequest = timedRequest(transaction);
+    const customerResult = await customerRequest
+      .input('codclie', sql.Int, parsed.value)
+      .query(`
+        SELECT TOP (1) Codclie, tipoDoc, Documento, Razon, CAST(COALESCE(Activo, 0) AS bit) AS Activo
+        FROM dbo.Clientes WITH (UPDLOCK, HOLDLOCK)
+        WHERE Codclie = @codclie
+      `);
+
+    if (!customerResult.recordset.length) {
+      await transaction.rollback();
+      transactionOpen = false;
+      return res.status(404).json({ error: 'El cliente seleccionado no existe.' });
+    }
+
+    const customerRecord = customerResult.recordset[0];
+    const type = String(customerRecord.tipoDoc ?? '').trim().toUpperCase();
+    const ruc = String(customerRecord.Documento ?? '').trim();
+    if (type !== 'R' || !/^\d{11}$/.test(ruc)) {
+      await transaction.rollback();
+      transactionOpen = false;
+      return res.status(400).json({ error: 'El cliente seleccionado no tiene un RUC válido para generar el historial.' });
+    }
+
+    const procedureRequest = timedRequest(transaction);
+    await procedureRequest.input('ruc', sql.Char(12), ruc).execute('[dbo].[sp_Historial_cliente]');
+
+    const historyRequest = timedRequest(transaction);
+    const historyResult = await historyRequest.query(`
+      SELECT Nro, Item, Vendedor, Documento, Numero, Fecha, Importe, Amortizado, FechaV,
+             saldo AS Saldo, Situacion
+      FROM dbo.t_Historial_Cliente
+      ORDER BY Nro, Item
+    `);
+
+    const client = {
+      Codclie: Number(customerRecord.Codclie),
+      Ruc: ruc,
+      Razon: String(customerRecord.Razon ?? '').trim(),
+      Activo: Boolean(customerRecord.Activo)
+    };
+    const report = buildCustomerHistoryReport(historyResult.recordset, client);
+
+    await transaction.commit();
+    transactionOpen = false;
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Historial del Cliente ${client.Codclie} - ${client.Razon} - RUC ${client.Ruc} (${report.data.length} registros)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    if (transactionOpen && transaction) {
+      try { await transaction.rollback(); } catch (rollbackError) {
+        console.error('[HISTORIAL CLIENTE ROLLBACK ERROR]', rollbackError);
+      }
+    }
+    console.error('[HISTORIAL CLIENTE ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el historial del cliente. Inténtelo nuevamente.' });
   }
 });
 

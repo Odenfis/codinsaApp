@@ -720,5 +720,21 @@ Este documento registra los hitos técnicos alcanzados durante la implementació
 - **Validación técnica:** las 40 pruebas unitarias, TypeScript, lint, build de producción y `git diff --check` finalizaron correctamente; permanece únicamente la advertencia informativa existente sobre tamaño del bundle.
 - Estado: ✅
 
+## 38. Reportes / Cuentas / Historial del Cliente
+
+**28/09/2026** — Nuevo reporte de documentos, amortizaciones y saldos basado en `[dbo].[sp_Historial_cliente]`.
+
+- Se agregó **Reportes → Cuentas → Historial del Cliente**, con ruta `/reports/accounts/customer-history` y acceso para Administrador, Auditor Senior y Gestor Operativo mediante el módulo `32`.
+- El selector autenticado busca hasta 50 clientes por RUC o razón social, sin distinguir tildes o mayúsculas, e incluye clientes activos e inactivos que tienen `tipoDoc = 'R'` y RUC numérico de 11 dígitos.
+- El endpoint `POST /api/reportes/historial-cliente` recibe únicamente `Codclie`, vuelve a resolver y validar el RUC en SQL Server y ejecuta el procedimiento original sin modificarlo.
+- La ejecución y lectura de `t_Historial_Cliente` usan una transacción `SERIALIZABLE`, timeout de 120 segundos y `sp_getapplock` exclusivo con el recurso `CODINSA_HISTORIAL_CLIENTE`, evitando cruces entre solicitudes simultáneas.
+- La API normaliza las once columnas del historial, ordena por `Nro` e `Item`, calcula documentos, importe, amortizado y saldo solamente sobre las filas principales `Item = 1`, y registra cada generación en auditoría.
+- La vista incorpora autocompletado con debounce, identificación de clientes inactivos, generación manual, cuatro indicadores, jerarquía visual documento–movimientos, estados de situación, tabla responsive y paginación de 20 filas.
+- Excel y PDF horizontal incluyen logo, cliente, RUC, fecha de generación, datos tipados, jerarquía, totales, encabezados repetidos y paginación, con nombres `Historial_Cliente_RUC`.
+- Se agregaron tipos y pruebas unitarias para validar `Codclie`, normalizar columnas case-insensitive, fechas, nulos, importes, ordenamiento y totales sin duplicar movimientos subordinados.
+- **Validación técnica:** las 44 pruebas unitarias del proyecto, TypeScript, build de producción y `git diff --check` finalizaron correctamente; permanece únicamente la advertencia informativa existente sobre tamaño del bundle.
+- La validación funcional contra SQL Server y la prueba concurrente real quedan pendientes porque la instancia configurada en `localhost:1433` no estuvo disponible desde el entorno de herramientas.
+- Estado: ✅
+
 ---
-*Última actualización: 25 de Septiembre, 2026*
+*Última actualización: 28 de Septiembre, 2026*
