@@ -6,6 +6,7 @@ import {
 import { KardexProductoResponse, KardexProductoRow, KardexProductoTotals } from '../../types';
 import { exportProductKardexToExcel, exportProductKardexToPdf } from '../../utils/exportUtils';
 import { loadTrimmedLogoDataUrl } from '../../utils/logoUtils';
+import { groupKardex, kardexPage, kardexColumns, kardexTitle, kardexCompany, kardexRuc, kardexAddress, kardexPeriod } from '../../utils/productKardexModel';
 import logoUrl from '../../../assets/logotipo.png';
 
 const months = [
@@ -17,18 +18,7 @@ const emptyTotals: KardexProductoTotals = { Saldoini: 0, Ingresos: 0, salidas: 0
 const quantity = new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const currency = new Intl.NumberFormat('es-PE', { style: 'currency', currency: 'PEN', minimumFractionDigits: 2 });
 
-const columns: Array<{ key: keyof KardexProductoRow; label: string; numeric?: boolean; money?: boolean }> = [
-  { key: 'codpro', label: 'Código' },
-  { key: 'codSunat', label: 'Cód. SUNAT' },
-  { key: 'Producto', label: 'Producto' },
-  { key: 'Unimed', label: 'Unidad' },
-  { key: 'Saldoini', label: 'Saldo inicial', numeric: true },
-  { key: 'Ingresos', label: 'Ingresos', numeric: true },
-  { key: 'salidas', label: 'Salidas', numeric: true },
-  { key: 'saldoFin', label: 'Saldo final', numeric: true },
-  { key: 'Costo', label: 'Costo', money: true },
-  { key: 'Valor', label: 'Valor', money: true }
-];
+const columns = kardexColumns as readonly { key: keyof KardexProductoRow; label: string; numeric?: boolean; money?: boolean }[];
 
 export const ProductKardexReportView: React.FC = () => {
   const today = useMemo(() => new Date(), []);
@@ -54,7 +44,8 @@ export const ProductKardexReportView: React.FC = () => {
   const data = report?.data || [];
   const totals = report?.totals || emptyTotals;
   const totalPages = Math.max(1, Math.ceil(data.length / perPage));
-  const visibleRows = data.slice((page - 1) * perPage, page * perPage);
+  const groups = useMemo(() => groupKardex(data), [data]);
+  const visibleLines = kardexPage(groups, page, perPage);
   const pages = Array.from({ length: totalPages }, (_, index) => index + 1)
     .filter(value => value === 1 || value === totalPages || Math.abs(value - page) <= 1);
   const years = Array.from({ length: Math.max(1, today.getFullYear() - 1999) }, (_, index) => today.getFullYear() - index);
@@ -165,19 +156,32 @@ export const ProductKardexReportView: React.FC = () => {
       </section>}
 
       <section className="w-full min-w-0 bg-surface-container-lowest border border-surface-variant rounded-xl shadow-sm overflow-hidden">
+        {report && <div className="p-4 border-b border-surface-variant text-xs space-y-1">
+          <h3 className="text-center font-bold text-base mb-3">{kardexTitle}</h3>
+          <div className="flex flex-wrap justify-between gap-2"><p>PERIODO: <strong>{kardexPeriod(report)}</strong></p><p>R.U.C.: <strong>{kardexRuc}</strong></p></div>
+          <p>RAZÓN SOCIAL: <strong>{kardexCompany}</strong></p>
+          <p>ESTABLECIMIENTO: <strong>{kardexAddress}</strong></p>
+        </div>}
+
         <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-surface-variant bg-surface text-[11px] font-medium text-outline">
           <span className="flex items-center gap-2"><MoveHorizontal size={15} className="text-primary" />Desplácese horizontalmente para ver todas las columnas</span>
           {report && <span className="hidden sm:inline font-bold text-primary">{periodLabel}</span>}
         </div>
-        <div className="report-table-scroll w-full max-w-full overflow-x-auto overscroll-x-contain" style={{ WebkitOverflowScrolling: 'touch', scrollbarGutter: 'stable' }}>
-          <table className="min-w-[1450px] w-full text-left border-collapse">
+        <div className="report-table-scroll isolate w-full max-w-full overflow-x-auto overscroll-x-contain" style={{ WebkitOverflowScrolling: 'touch', scrollbarGutter: 'stable' }}>
+          <table className="min-w-[1100px] w-full text-left border-collapse">
             <thead><tr className="bg-surface-container text-on-surface-variant text-[10px] font-bold uppercase tracking-wide border-b border-surface-variant">
-              {columns.map((column, index) => <th key={column.key} className={`py-3 px-3 whitespace-nowrap ${column.numeric || column.money ? 'text-right' : ''} ${index === 0 ? 'sticky left-0 z-30 w-[130px] bg-surface-container' : ''} ${index === 2 ? 'min-w-[320px]' : ''}`}>{column.label}</th>)}
+              {columns.map((column, index) => <th key={column.key} className={`py-3 px-3 whitespace-nowrap ${column.numeric || column.money ? 'text-right' : ''} ${index === 0 ? 'sticky left-0 z-30 w-[130px] bg-surface-container' : ''} ${index === 1 ? 'min-w-[320px]' : ''}`}>{column.label}</th>)}
             </tr></thead>
             <tbody className="text-xs divide-y divide-surface-variant">
-              {visibleRows.map((row, index) => <tr key={`${row.codpro}-${index}`} className="hover:bg-primary-container/10 even:bg-surface-container-low">
-                {columns.map((column, columnIndex) => <td key={column.key} title={column.key === 'Producto' ? row.Producto : undefined} className={`py-3 px-3 whitespace-nowrap ${column.numeric || column.money ? 'text-right font-mono' : ''} ${column.key === 'Producto' ? 'max-w-[420px] truncate font-semibold' : ''} ${column.key === 'saldoFin' || column.key === 'Valor' ? 'font-bold text-primary' : ''} ${columnIndex === 0 ? `sticky left-0 z-20 w-[130px] font-semibold ${index % 2 ? 'bg-surface-container-low' : 'bg-surface-container-lowest'}` : ''}`}>{renderValue(row, column)}</td>)}
-              </tr>)}
+              {visibleLines.map((line, index) => {
+                if (line.kind === 'laboratory') return <tr key={`lab-${index}`} className="bg-surface-container"><td colSpan={columns.length} className="px-3 py-2 font-bold text-primary">LABORATORIO: <span className="font-medium">{line.name}{line.continued ? ' (continuación)' : ''}</span></td></tr>;
+                if (line.kind === 'subtotal' || line.kind === 'total') return <tr key={`total-${index}`} className="font-bold border-t-2 border-primary/30 bg-primary-container/20"><td colSpan={3} className="px-3 py-2 text-right">{line.kind === 'total' ? 'Total general' : 'Total por laboratorio'}</td>{['Saldoini', 'Ingresos', 'salidas', 'saldoFin', 'Valor'].map(key => <td key={key} className="px-3 py-2 text-right font-mono">{key === 'Valor' ? currency.format(line.totals.Valor) : quantity.format(line.totals[key as keyof KardexProductoTotals])}</td>)}</tr>;
+                if (line.kind !== 'product') return null;
+                const row = line.row;
+                return <tr key={`${row.codpro}-${index}`} className="hover:bg-primary-container/10 even:bg-surface-container-low">
+                  {columns.map((column, columnIndex) => <td key={column.key} className={`py-2 px-3 ${column.numeric ? 'text-right font-mono whitespace-nowrap' : ''} ${column.key === 'Producto' ? 'min-w-[320px] font-semibold' : ''} ${columnIndex === 0 ? 'sticky left-0 z-20 bg-surface-container-lowest font-semibold' : ''}`}>{renderValue(row, column)}</td>)}
+                </tr>;
+              })}
               {!loading && !data.length && <tr><td colSpan={columns.length} className="py-16 text-center text-outline"><PackageSearch size={34} className="mx-auto mb-3 opacity-40" /><p className="text-sm font-semibold">{hasSearched ? 'No se encontraron productos para el periodo seleccionado.' : 'Seleccione el mes y año para generar el Kardex de Productos.'}</p></td></tr>}
               {loading && <tr><td colSpan={columns.length} className="py-16 text-center text-primary"><LoaderCircle size={32} className="animate-spin mx-auto mb-3" /><p className="text-sm font-semibold">Calculando inventario valorizado…</p></td></tr>}
             </tbody>

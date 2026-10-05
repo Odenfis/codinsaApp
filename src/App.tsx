@@ -26,6 +26,9 @@ import { SalesRegisterReportView } from './components/modules/SalesRegisterRepor
 import { CustomersBySalespersonReportView } from './components/modules/CustomersBySalespersonReportView';
 import { MonthlyQuarterlySalesReportView } from './components/modules/MonthlyQuarterlySalesReportView';
 import { DailySalesControlReportView } from './components/modules/DailySalesControlReportView';
+import { PsychotropicBalanceReportView } from './components/modules/PsychotropicBalanceReportView';
+import { PsychotropicPurchasesReportView } from './components/modules/PsychotropicPurchasesReportView';
+import { PsychotropicSalesReportView } from './components/modules/PsychotropicSalesReportView';
 import { PurchaseRegisterReportView } from './components/modules/PurchaseRegisterReportView';
 import { SettingsView } from './components/modules/SettingsView';
 import { AuditView } from './components/modules/AuditView';
@@ -82,6 +85,10 @@ const MainLayout: React.FC = () => {
       case '/reports/sales/daily-control': return <DailySalesControlReportView />;
       case '/reports/purchases': return <PurchaseRegisterReportView />;
       case '/reports/purchases/purchase-register': return <PurchaseRegisterReportView />;
+      case '/reports/technical-direction':
+      case '/reports/technical-direction/psychotropic-balance': return <PsychotropicBalanceReportView />;
+      case '/reports/technical-direction/psychotropic-purchases': return <PsychotropicPurchasesReportView />;
+      case '/reports/technical-direction/psychotropic-sales': return <PsychotropicSalesReportView />;
       case '/settings': return <SettingsView />;
       case '/settings/backups': return <SettingsView />;
       case '/settings/nisira-export': return <NisiraExportView />;

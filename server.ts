@@ -28,6 +28,9 @@ import { buildSalesRegisterReport, parseSalesRegisterParameters } from './src/ba
 import { buildCustomersBySalespersonReport, parseCustomersBySalespersonParameters } from './src/backend/services/customersBySalespersonReport';
 import { buildMonthlyQuarterlySalesReport, parseMonthlyQuarterlySalesParameters } from './src/backend/services/monthlyQuarterlySalesReport';
 import { buildDailySalesControlReport } from './src/backend/services/dailySalesControlReport';
+import { buildPsychotropicBalanceReport, parsePsychotropicBalanceParameters, validatePsychotropicBalanceOperationalDate, psychotropicBalanceQuery } from './src/backend/services/psychotropicBalanceReport';
+import { buildPsychotropicPurchasesReport, parsePsychotropicPurchasesParameters, psychotropicPurchasesQuery } from './src/backend/services/psychotropicPurchasesReport';
+import { buildPsychotropicSalesReport, parsePsychotropicSalesParameters, psychotropicSalesQuery } from './src/backend/services/psychotropicSalesReport';
 import { buildPurchaseRegisterReport, parsePurchaseRegisterParameters } from './src/backend/services/purchaseRegisterReport';
 import { buildCustomerHistoryReport, parseCustomerHistoryCustomerId } from './src/backend/services/customerHistoryReport';
 import dotenv from 'dotenv';
@@ -696,10 +699,14 @@ app.get('/api/reportes/kardex-productos', authMiddleware, async (req: Authentica
 
           EXEC [dbo].[sp_KardexDelMesX] @mes = @mes, @anio = @anio;
 
-          SELECT FecIni, FecFin, codpro, codSunat, Producto, Unimed,
-                 Saldoini, Ingresos, salidas, saldoFin, Costo, Valor
-          FROM [dbo].[LibInvValorizado]
-          ORDER BY Producto, codpro;
+          IF EXISTS (SELECT RTRIM(CodLab) FROM dbo.Laboratorios GROUP BY RTRIM(CodLab) HAVING COUNT(*) > 1)
+            THROW 51001, 'El catálogo de laboratorios contiene códigos duplicados.', 1;
+          SELECT k.FecIni, k.FecFin, k.codpro, k.codSunat, k.Producto, k.Unimed,
+                 k.Saldoini, k.Ingresos, k.salidas, k.saldoFin, k.Costo, k.Valor,
+                 RTRIM(l.CodLab) AS LaboratorioCodigo, RTRIM(l.Descripcion) AS Laboratorio
+          FROM [dbo].[LibInvValorizado] k
+          LEFT JOIN dbo.Laboratorios l ON RTRIM(l.CodLab) = LEFT(k.codpro, 2)
+          ORDER BY l.Descripcion, k.Producto, k.codpro;
         `);
       await transaction.commit();
     } catch (transactionError) {
@@ -711,6 +718,8 @@ app.get('/api/reportes/kardex-productos', authMiddleware, async (req: Authentica
     const dateValue = (value: unknown) => value instanceof Date ? value.toISOString() : textValue(value);
     const data = result.recordset.map((record: Record<string, unknown>) => {
       const normalized: Record<string, unknown> = {
+        LaboratorioCodigo: textValue(record.LaboratorioCodigo),
+        Laboratorio: textValue(record.Laboratorio) || 'Sin laboratorio',
         FecIni: dateValue(record.FecIni),
         FecFin: dateValue(record.FecFin),
         codpro: textValue(record.codpro),
@@ -1156,6 +1165,127 @@ app.get('/api/reportes/registro-compras', authMiddleware, async (req: Authentica
   } catch (err) {
     console.error('[REGISTRO COMPRAS ERROR]', err);
     return res.status(500).json({ error: 'No se pudo generar el Registro de Compras. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/ventas-psicotropicos', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const parameters = parsePsychotropicSalesParameters(req.query.desde, req.query.hasta);
+  if (parameters.error) return res.status(400).json({ error: parameters.error });
+  const { desde, hasta, fromDate, toDate } = parameters.value;
+
+  try {
+    const pool = await getDbPool();
+    const transaction = new sql.Transaction(pool);
+    let report;
+    try {
+      await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+      const request = new sql.Request(transaction);
+      (request as sql.Request & { timeout: number }).timeout = 300000;
+      const result = await request
+        .input('fec1', sql.SmallDateTime, fromDate)
+        .input('fec2', sql.SmallDateTime, toDate)
+        .query(psychotropicSalesQuery);
+      report = buildPsychotropicSalesReport(result.recordset as Record<string, unknown>[], desde, hasta);
+      await transaction.commit();
+    } catch (transactionError) {
+      try { await transaction.rollback(); } catch { /* SQL Server puede haber cerrado la transacción. */ }
+      throw transactionError;
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Ventas Psicotrópicos ${desde} al ${hasta} (${report.total} registros)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    console.error('[VENTAS PSICOTROPICOS ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el reporte Ventas Psicotrópicos. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/compras-psicotropicos', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const parameters = parsePsychotropicPurchasesParameters(req.query.desde, req.query.hasta);
+  if (parameters.error) return res.status(400).json({ error: parameters.error });
+  const { desde, hasta, fromDate, toDate } = parameters.value;
+
+  try {
+    const pool = await getDbPool();
+    const transaction = new sql.Transaction(pool);
+    let report;
+    try {
+      await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+      const request = new sql.Request(transaction);
+      (request as sql.Request & { timeout: number }).timeout = 300000;
+      const result = await request
+        .input('fec1', sql.SmallDateTime, fromDate)
+        .input('fec2', sql.SmallDateTime, toDate)
+        .query(psychotropicPurchasesQuery);
+      report = buildPsychotropicPurchasesReport(result.recordset as Record<string, unknown>[], desde, hasta);
+      await transaction.commit();
+    } catch (transactionError) {
+      try { await transaction.rollback(); } catch { /* SQL Server puede haber cerrado la transacción. */ }
+      throw transactionError;
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Compras Psicotrópicos ${desde} al ${hasta} (${report.total} registros)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    console.error('[COMPRAS PSICOTROPICOS ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el reporte Compras Psicotrópicos. Inténtelo nuevamente.' });
+  }
+});
+
+app.get('/api/reportes/balance-psicotropico', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const parameters = parsePsychotropicBalanceParameters(req.query.desde, req.query.hasta);
+  if (parameters.error) return res.status(400).json({ error: parameters.error });
+  const { desde, hasta, fromDate, toDate } = parameters.value;
+
+  try {
+    const pool = await getDbPool();
+    const transaction = new sql.Transaction(pool);
+    let report;
+    try {
+      await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+      const dateResult = await new sql.Request(transaction).query("SELECT CONVERT(varchar(10), GETDATE(), 23) AS operationalDate;");
+      const operationalDate = dateResult.recordset[0].operationalDate as string;
+      const dateError = validatePsychotropicBalanceOperationalDate(hasta, operationalDate);
+      if (dateError) {
+        await transaction.rollback();
+        return res.status(400).json({ error: dateError });
+      }
+      const request = new sql.Request(transaction);
+      (request as sql.Request & { timeout: number }).timeout = 300000;
+      const result = await request
+        .input('fechaIni', sql.Date, fromDate)
+        .input('fechaFin', sql.Date, toDate)
+        .query(psychotropicBalanceQuery);
+      report = buildPsychotropicBalanceReport(result.recordset as Record<string, unknown>[], desde, hasta, operationalDate);
+      await transaction.commit();
+    } catch (transactionError) {
+      try { await transaction.rollback(); } catch { /* SQL Server puede haber cerrado la transacción. */ }
+      throw transactionError;
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes',
+      `Generó Balance Psicotrópico ${desde} al ${hasta} (${report.total} registros)`,
+      req.ip
+    );
+    return res.json(report);
+  } catch (err) {
+    console.error('[BALANCE PSICOTROPICO ERROR]', err);
+    return res.status(500).json({ error: 'No se pudo generar el reporte Balance Psicotrópico. Inténtelo nuevamente.' });
   }
 });
 

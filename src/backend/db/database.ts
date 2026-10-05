@@ -43,6 +43,11 @@ class EnterpriseDatabase {
       ] },
       { id_modulo: 30, nombre_modulo: 'Compras', icono: 'ShoppingBag', ruta: '/reports/purchases', orden: 4, estado: true, children: [
         { id_modulo: 31, nombre_modulo: 'Registro de Compras', icono: 'ReceiptText', ruta: '/reports/purchases/purchase-register', orden: 1, estado: true }
+      ] },
+      { id_modulo: 33, nombre_modulo: 'Dirección Técnica', icono: 'ClipboardCheck', ruta: '/reports/technical-direction', orden: 5, estado: true, children: [
+        { id_modulo: 34, nombre_modulo: 'Ventas Psicotrópicos', icono: 'ReceiptText', ruta: '/reports/technical-direction/psychotropic-sales', orden: 1, estado: true },
+        { id_modulo: 35, nombre_modulo: 'Compras Psicotrópicos', icono: 'ReceiptText', ruta: '/reports/technical-direction/psychotropic-purchases', orden: 2, estado: true },
+        { id_modulo: 36, nombre_modulo: 'Balance Psicotrópico', icono: 'ClipboardCheck', ruta: '/reports/technical-direction/psychotropic-balance', orden: 3, estado: true }
       ] }
     ] },
     { id_modulo: 3, nombre_modulo: 'Providers', icono: 'Network', ruta: '/providers', orden: 5, estado: false },
@@ -57,9 +62,9 @@ class EnterpriseDatabase {
   ];
 
   public rolesModulos: Record<number, number[]> = {
-    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32],
-    2: [1, 2, 3, 5, 7, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32],
-    3: [1, 2, 3, 5, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36],
+    2: [1, 2, 3, 5, 7, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36],
+    3: [1, 2, 3, 5, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
   };
 
   public usuarios: Usuario[] = [

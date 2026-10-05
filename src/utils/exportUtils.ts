@@ -9,7 +9,7 @@ import type ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
-  CobranzaReporteRow, CobranzaReporteTotals, KardexProductoResponse, PlanillaCobranzaResponse,
+  CobranzaReporteRow, CobranzaReporteTotals, PlanillaCobranzaResponse,
   ValuedStockResponse
 } from '../types';
 import {
@@ -424,158 +424,11 @@ export async function exportCollectionSheetToPdf(report: PlanillaCobranzaRespons
   doc.save(`${collectionSheetFilename(report)}.pdf`);
 }
 
-const kardexHeaders = [
-  'Código', 'Cód. SUNAT', 'Producto', 'Unidad', 'Saldo inicial',
-  'Ingresos', 'Salidas', 'Saldo final', 'Costo', 'Valor'
-];
 const kardexMonthNames = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
-const kardexFilename = (report: KardexProductoResponse) =>
-  `Kardex_Productos_${String(report.period.mes).padStart(2, '0')}_${report.period.anio}`;
-
-export async function exportProductKardexToExcel(report: KardexProductoResponse) {
-  if (!report.data.length) return;
-  const { default: ExcelJSRuntime } = await import('exceljs');
-  const workbook = new ExcelJSRuntime.Workbook();
-  workbook.creator = 'CODINSA Tool Kit';
-  workbook.created = new Date();
-  const sheet = workbook.addWorksheet('Kardex de Productos', {
-    pageSetup: {
-      orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
-      margins: { left: 0.25, right: 0.25, top: 0.3, bottom: 0.3, header: 0, footer: 0 }
-    },
-    views: [{ state: 'frozen', ySplit: 7, activeCell: 'A8', showGridLines: false }]
-  });
-  sheet.columns = [15, 18, 48, 16, 16, 14, 14, 16, 16, 18].map(width => ({ width }));
-
-  const logo = await loadTrimmedLogoDataUrl(logoUrl);
-  const logoHeight = 72;
-  const logoId = workbook.addImage({ base64: logo.dataUrl, extension: 'png' });
-  sheet.addImage(logoId, { tl: { col: 0.15, row: 0.15 }, ext: { width: logoHeight * logo.aspectRatio, height: logoHeight } });
-  sheet.mergeCells('D2:J2');
-  sheet.getCell('D2').value = 'KARDEX DE PRODUCTOS';
-  sheet.getCell('D2').font = { bold: true, size: 18, color: { argb: 'FF006767' } };
-  sheet.getCell('D2').alignment = { horizontal: 'center' };
-  sheet.mergeCells('D3:J3');
-  sheet.getCell('D3').value = `Periodo: ${kardexMonthNames[report.period.mes - 1]} ${report.period.anio}`;
-  sheet.getCell('D3').font = { bold: true, size: 11, color: { argb: 'FF3E4948' } };
-  sheet.getCell('D3').alignment = { horizontal: 'center' };
-  sheet.mergeCells('D4:J4');
-  sheet.getCell('D4').value = `Generado: ${new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date())}`;
-  sheet.getCell('D4').font = { size: 9, color: { argb: 'FF6F7979' } };
-  sheet.getCell('D4').alignment = { horizontal: 'center' };
-
-  const headerRow = sheet.getRow(7);
-  headerRow.values = kardexHeaders;
-  headerRow.height = 25;
-  headerRow.eachCell(cell => {
-    cell.font = { bold: true, size: 9, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF006767' } };
-    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    cell.border = {
-      top: { style: 'thin', color: { argb: 'FF607878' } }, bottom: { style: 'thin', color: { argb: 'FF607878' } },
-      left: { style: 'thin', color: { argb: 'FF607878' } }, right: { style: 'thin', color: { argb: 'FF607878' } }
-    };
-  });
-
-  report.data.forEach((item, index) => {
-    const row = sheet.addRow([
-      item.codpro, item.codSunat, item.Producto, item.Unimed, item.Saldoini,
-      item.Ingresos, item.salidas, item.saldoFin, item.Costo, item.Valor
-    ]);
-    row.height = 20;
-    row.eachCell((cell, column) => {
-      cell.font = { size: 9 };
-      cell.alignment = { vertical: 'middle', horizontal: column >= 5 ? 'right' : 'left' };
-      cell.border = { bottom: { style: 'hair', color: { argb: 'FFD5DEDE' } } };
-      if (index % 2 === 1) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F3F5' } };
-    });
-    [5, 6, 7, 8].forEach(column => { row.getCell(column).numFmt = '#,##0.00'; });
-    [9, 10].forEach(column => { row.getCell(column).numFmt = 'S/ #,##0.00'; });
-  });
-
-  const totalRow = sheet.addRow([
-    'TOTAL', '', '', '', report.totals.Saldoini, report.totals.Ingresos,
-    report.totals.salidas, report.totals.saldoFin, '', report.totals.Valor
-  ]);
-  sheet.mergeCells(totalRow.number, 1, totalRow.number, 4);
-  totalRow.height = 23;
-  totalRow.eachCell(cell => {
-    cell.font = { bold: true, size: 9, color: { argb: 'FF006767' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCEEEE' } };
-    cell.border = { top: { style: 'thin', color: { argb: 'FF006767' } }, bottom: { style: 'thin', color: { argb: 'FF006767' } } };
-  });
-  totalRow.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
-  [5, 6, 7, 8].forEach(column => { totalRow.getCell(column).numFmt = '#,##0.00'; });
-  totalRow.getCell(10).numFmt = 'S/ #,##0.00';
-  sheet.autoFilter = { from: 'A7', to: `J${7 + report.data.length}` };
-  sheet.pageSetup.printArea = `A1:J${totalRow.number}`;
-  sheet.headerFooter.oddFooter = `&LPeriodo: ${String(report.period.mes).padStart(2, '0')}/${report.period.anio}&RPágina &P de &N`;
-
-  const buffer = await workbook.xlsx.writeBuffer();
-  downloadBuffer(buffer, `${kardexFilename(report)}.xlsx`);
-}
-
-export async function exportProductKardexToPdf(report: KardexProductoResponse) {
-  if (!report.data.length) return;
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const logo = await loadTrimmedLogoDataUrl(logoUrl);
-  const logoHeight = 19;
-  const logoWidth = logoHeight * logo.aspectRatio;
-  const generatedAt = new Intl.DateTimeFormat('es-PE', { dateStyle: 'short', timeStyle: 'short' }).format(new Date());
-  const totalPagesToken = '{total_pages_count_string}';
-  const period = `${kardexMonthNames[report.period.mes - 1]} ${report.period.anio}`;
-  const body: string[][] = report.data.map(item => [
-    item.codpro, item.codSunat, item.Producto, item.Unimed,
-    pdfMoney(item.Saldoini), pdfMoney(item.Ingresos), pdfMoney(item.salidas),
-    pdfMoney(item.saldoFin), pdfMoney(item.Costo), pdfMoney(item.Valor)
-  ]);
-  body.push([
-    'TOTAL', '', '', '', pdfMoney(report.totals.Saldoini), pdfMoney(report.totals.Ingresos),
-    pdfMoney(report.totals.salidas), pdfMoney(report.totals.saldoFin), '', pdfMoney(report.totals.Valor)
-  ]);
-
-  autoTable(doc, {
-    startY: 32,
-    margin: { top: 32, right: 7, bottom: 12, left: 7 },
-    head: [kardexHeaders],
-    body,
-    theme: 'grid',
-    showHead: 'everyPage',
-    headStyles: { fillColor: [0, 103, 103], textColor: 255, fontStyle: 'bold', halign: 'center' },
-    alternateRowStyles: { fillColor: [241, 243, 245] },
-    styles: { fontSize: 7, cellPadding: 1.4, overflow: 'ellipsize', valign: 'middle', lineColor: [190, 203, 203], lineWidth: 0.1 },
-    columnStyles: {
-      0: { cellWidth: 20 }, 1: { cellWidth: 22 }, 2: { cellWidth: 64 }, 3: { cellWidth: 18 },
-      4: { cellWidth: 23, halign: 'right' }, 5: { cellWidth: 21, halign: 'right' },
-      6: { cellWidth: 21, halign: 'right' }, 7: { cellWidth: 23, halign: 'right' },
-      8: { cellWidth: 23, halign: 'right' }, 9: { cellWidth: 25, halign: 'right' }
-    },
-    didParseCell: hook => {
-      if (hook.section === 'body' && hook.row.index === body.length - 1) {
-        hook.cell.styles.fontStyle = 'bold';
-        hook.cell.styles.fillColor = [220, 238, 238];
-        hook.cell.styles.textColor = [0, 103, 103];
-      }
-    },
-    didDrawPage: hook => {
-      const width = doc.internal.pageSize.getWidth();
-      doc.addImage(logo.dataUrl, 'PNG', 7, 4, logoWidth, logoHeight, undefined, 'FAST');
-      doc.setTextColor(0, 103, 103); doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-      doc.text('KARDEX DE PRODUCTOS', width / 2, 11, { align: 'center' });
-      doc.setTextColor(62, 73, 72); doc.setFontSize(9);
-      doc.text(`Periodo: ${period}`, width / 2, 18, { align: 'center' });
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(111, 121, 121);
-      doc.text(`Generado: ${generatedAt}`, width - 7, 10, { align: 'right' });
-      doc.text(`Página ${hook.pageNumber} de ${totalPagesToken}`, width - 7, 17, { align: 'right' });
-    }
-  });
-  if (typeof doc.putTotalPages === 'function') doc.putTotalPages(totalPagesToken);
-  doc.save(`${kardexFilename(report)}.pdf`);
-}
-
+export { exportProductKardexToExcel, exportProductKardexToPdf } from './productKardexExport';
 const valuedStockHeaders = [
   'Código', 'Cód. SUNAT', 'Producto', 'Lote', 'Almacén', 'Unidad',
   'Stock inicial', 'Ingresos', 'Salidas', 'Stock final', 'Valor unitario', 'Valorizado'

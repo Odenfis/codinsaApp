@@ -234,6 +234,8 @@ export interface CobranzaReporteResponse {
 }
 
 export interface KardexProductoRow {
+  LaboratorioCodigo: string;
+  Laboratorio: string;
   FecIni: string;
   FecFin: string;
   codpro: string;
@@ -772,3 +774,94 @@ export interface ErpUpdateConfig {
 }
 
 export type { TablaNisira, NisiraExportResponse, NisiraDirectConfig } from './nisira';
+
+export interface PsychotropicSalesRow {
+  Principio: string;
+  Concentracion: string;
+  Descripcion: string;
+  RegistroSanitario: string;
+  FF: string | null;
+  Cantidad: number;
+  Ruc: string;
+  Establecimiento: string;
+  Distrito: string;
+  Direccion: string;
+  Lote: string;
+  Fecha: string | null;
+  NumFactura: string;
+}
+export interface PsychotropicSalesTotals {
+  registros: number;
+  establecimientos: number;
+  tab: number;
+  got: number;
+  sinFF: number;
+}
+export interface PsychotropicSalesResponse {
+  data: PsychotropicSalesRow[];
+  total: number;
+  totals: PsychotropicSalesTotals;
+  period: { desde: string; hasta: string };
+  generatedAt: string;
+}
+
+
+export interface PsychotropicPurchasesRow {
+  Principio: string;
+  Concentracion: string;
+  Descripcion: string;
+  FF: string | null;
+  NroFactura: string;
+  Proveedor: string;
+  Fecha: string | null;
+  Cantidad: number;
+  Lote: string;
+}
+export interface PsychotropicPurchasesTotals {
+  registros: number;
+  facturas: number;
+  proveedores: number;
+  tab: number;
+  got: number;
+  sinFF: number;
+}
+export interface PsychotropicPurchasesResponse {
+  data: PsychotropicPurchasesRow[];
+  total: number;
+  totals: PsychotropicPurchasesTotals;
+  period: { desde: string; hasta: string };
+  generatedAt: string;
+}
+
+export interface PsychotropicBalanceQuantities {
+  SaldoAnterior: number | null;
+  Ingresos: number | null;
+  Egresos: number | null;
+  SaldoActual: number | null;
+}
+export interface PsychotropicBalanceRow extends PsychotropicBalanceQuantities {
+  Codpro: string;
+  Principio: string;
+  Concentracion: string;
+  Descripcion: string;
+  FF: string | null;
+  Laboratorio: string;
+  Lote: string;
+  Vence: string | null;
+}
+export interface PsychotropicBalanceTotals {
+  registros: number;
+  productos: number;
+  lotes: number;
+  discrepantes: number;
+  incompletos: number;
+  porFF: Record<'TAB' | 'GOT' | 'sinFF', Record<keyof PsychotropicBalanceQuantities, number>>;
+}
+export interface PsychotropicBalanceResponse {
+  data: PsychotropicBalanceRow[];
+  total: number;
+  totals: PsychotropicBalanceTotals;
+  period: { desde: string; hasta: string };
+  operationalDate: string;
+  generatedAt: string;
+}
