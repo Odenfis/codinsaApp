@@ -39,7 +39,8 @@ class EnterpriseDatabase {
         { id_modulo: 26, nombre_modulo: 'Registro de Ventas', icono: 'ReceiptText', ruta: '/reports/sales/sales-register', orden: 3, estado: true },
         { id_modulo: 27, nombre_modulo: 'Reportes de Clientes por Vendedor', icono: 'Users', ruta: '/reports/sales/customers-by-salesperson', orden: 4, estado: true },
         { id_modulo: 28, nombre_modulo: 'Ventas Mensuales o Trimestrales', icono: 'CalendarRange', ruta: '/reports/sales/monthly-quarterly-sales', orden: 5, estado: true },
-        { id_modulo: 29, nombre_modulo: 'Control Diario', icono: 'ClipboardCheck', ruta: '/reports/sales/daily-control', orden: 6, estado: true }
+        { id_modulo: 29, nombre_modulo: 'Control Diario', icono: 'ClipboardCheck', ruta: '/reports/sales/daily-control', orden: 6, estado: true },
+        { id_modulo: 37, nombre_modulo: 'Reportes Mes Laboratorios', icono: 'CalendarRange', ruta: '/reports/sales/monthly-laboratories', orden: 7, estado: true }
       ] },
       { id_modulo: 30, nombre_modulo: 'Compras', icono: 'ShoppingBag', ruta: '/reports/purchases', orden: 4, estado: true, children: [
         { id_modulo: 31, nombre_modulo: 'Registro de Compras', icono: 'ReceiptText', ruta: '/reports/purchases/purchase-register', orden: 1, estado: true }
@@ -62,9 +63,9 @@ class EnterpriseDatabase {
   ];
 
   public rolesModulos: Record<number, number[]> = {
-    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36],
-    2: [1, 2, 3, 5, 7, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36],
-    3: [1, 2, 3, 5, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37],
+    2: [1, 2, 3, 5, 7, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37],
+    3: [1, 2, 3, 5, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37]
   };
 
   public usuarios: Usuario[] = [

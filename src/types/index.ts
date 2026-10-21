@@ -175,6 +175,10 @@ export interface ClienteSimple {
   Codclie: number;
   Razon: string;
   Documento: string;
+  ubigeo: string | null;
+  departamento: string | null;
+  provincia: string | null;
+  distrito: string | null;
 }
 
 export interface Producto {
@@ -188,6 +192,8 @@ export interface Producto {
   PventaMi: number;
   Eliminado: boolean;
   CodLab: string | null;
+  CodLab1: string | null;
+  CodLabo: string | null;
   linea_descripcion?: string;
   lab_descripcion?: string;
 }
@@ -864,4 +870,31 @@ export interface PsychotropicBalanceResponse {
   period: { desde: string; hasta: string };
   operationalDate: string;
   generatedAt: string;
+}
+
+export type MonthlyLaboratoriesCell = string | number | null;
+export interface MonthlyLaboratoriesColumn {
+  key: string;
+  label: string;
+  kind: 'text' | 'number' | 'money' | 'date';
+  width: number;
+}
+export interface MonthlyLaboratoriesTotals {
+  registros: number;
+  cantidad: number;
+  importe: number;
+}
+export interface MonthlyLaboratoriesSection {
+  id: string;
+  name: string;
+  columns: MonthlyLaboratoriesColumn[];
+  data: Record<string, MonthlyLaboratoriesCell>[];
+  total: number;
+  totals: MonthlyLaboratoriesTotals;
+}
+export interface MonthlyLaboratoriesResponse {
+  period: { mes: number; anio: number };
+  generatedAt: string;
+  laboratories: MonthlyLaboratoriesSection[];
+  total: number;
 }

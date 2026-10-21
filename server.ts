@@ -11,6 +11,8 @@ import fs from 'fs';
 import session from 'express-session';
 import { createServer as createViteServer } from 'vite';
 import { getDbPool, sql } from './src/db';
+import { parseMonthlyLaboratoriesParameters, monthlyLaboratoriesPreflight, monthlyLaboratoriesQuery, buildMonthlyLaboratoriesReport } from './src/backend/services/monthlyLaboratoriesReport';
+import { parseProductCodeChanges, buildProductCodesUpdate } from './src/backend/services/productCodes';
 import { desencriptarPassword } from './src/authUtils';
 import { authMiddleware, AuthenticatedRequest } from './src/backend/middlewares/authMiddleware';
 import { AuthService, DashboardService } from './src/backend/services';
@@ -232,7 +234,7 @@ app.get('/api/productos', authMiddleware, async (req: Request, res: Response) =>
     const linea = (req.query.linea as string) || '';
     const lab = (req.query.lab as string) || '';
 
-    let query = `SELECT p.CodPro, p.CodBar, p.Nombre, p.Clinea, p.Stock, p.Costo, p.PventaMa, p.PventaMi, p.Eliminado, p.CodLab, l.Descripcion AS linea_descripcion, lab.Descripcion AS lab_descripcion FROM Productos p LEFT JOIN Lineas l ON p.Clinea = l.CodLinea LEFT JOIN Laboratorios lab ON LEFT(p.CodPro, 2) = LEFT(lab.CodLab, 2) WHERE p.Eliminado = 0`;
+    let query = `SELECT p.CodPro, p.CodBar, p.Nombre, p.Clinea, p.Stock, p.Costo, p.PventaMa, p.PventaMi, p.Eliminado, p.CodLab, p.Codlab1 AS CodLab1, p.Codlabo AS CodLabo, l.Descripcion AS linea_descripcion, lab.Descripcion AS lab_descripcion FROM Productos p LEFT JOIN Lineas l ON p.Clinea = l.CodLinea LEFT JOIN Laboratorios lab ON LEFT(p.CodPro, 2) = LEFT(lab.CodLab, 2) WHERE p.Eliminado = 0`;
     const request = pool.request();
 
     if (search) {
@@ -276,6 +278,39 @@ app.get('/api/productos/laboratorios', authMiddleware, async (req: Request, res:
   } catch (err: any) {
     console.error('[PRODUCTOS ERROR]', err);
     return res.status(500).json({ error: 'Error al obtener laboratorios.' });
+  }
+});
+
+app.patch('/api/productos/:codpro/codigos', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const { codpro } = req.params;
+  if (!codpro.trim() || codpro.length > 10) {
+    return res.status(400).json({ error: 'Código de producto inválido.' });
+  }
+  let changes: ReturnType<typeof parseProductCodeChanges>;
+  try {
+    changes = parseProductCodeChanges(req.body);
+  } catch (err) {
+    return res.status(400).json({ error: (err as Error).message });
+  }
+  try {
+    const pool = await getDbPool();
+    const request = pool.request().input('codpro', sql.Char(10), codpro);
+    for (const [field, value] of Object.entries(changes)) {
+      request.input(field, sql.VarChar(50), value);
+    }
+    const result = await request.query(buildProductCodesUpdate(changes));
+    const codes = result.recordset[0];
+    if (!codes) return res.status(404).json({ error: 'No se encontró el producto.' });
+    db.addAuditLog(
+      req.user?.nombres + ' ' + req.user?.apellidos,
+      'Productos',
+      `Actualizó códigos del producto ${codpro}: ${Object.entries(changes).map(([field, value]) => `${field} → ${value ?? '(ninguno)'}`).join(', ')}`,
+      req.ip
+    );
+    return res.json({ success: true, ...codes });
+  } catch (err) {
+    console.error('[PRODUCTOS CODIGOS ERROR]', err);
+    return res.status(500).json({ error: 'No se pudieron guardar los códigos del producto.' });
   }
 });
 
@@ -1080,6 +1115,44 @@ app.get('/api/reportes/ventas-mensuales-trimestrales', authMiddleware, async (re
   }
 });
 
+app.post('/api/reportes/mes-laboratorios', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store');
+  let parameters: { mes: number; anio: number };
+  try { parameters = parseMonthlyLaboratoriesParameters(req.body); }
+  catch (err) { return res.status(400).json({ error: (err as Error).message }); }
+  const { mes, anio } = parameters;
+  try {
+    const pool = await getDbPool();
+    const transaction = new sql.Transaction(pool);
+    let report;
+    try {
+      await transaction.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
+      const preflight = new sql.Request(transaction);
+      (preflight as sql.Request & { timeout: number }).timeout = 300000;
+      await preflight.query(monthlyLaboratoriesPreflight);
+      const request = new sql.Request(transaction);
+      (request as sql.Request & { timeout: number }).timeout = 300000;
+      const result = await request.input('mes', sql.Int, mes).input('anio', sql.Int, anio).query(monthlyLaboratoriesQuery);
+      report = buildMonthlyLaboratoriesReport(result.recordsets as unknown as Record<string, unknown>[][], mes, anio);
+      await transaction.commit();
+    } catch (err) {
+      try { await transaction.rollback(); } catch { /* SQL Server may have already rolled back. */ }
+      throw err;
+    }
+    db.addAuditLog(
+      `${req.user?.nombres || ''} ${req.user?.apellidos || ''}`.trim() || req.user?.usuario || 'Usuario',
+      'Reportes', `Generó Reportes Mes Laboratorios ${mes}/${anio} (${report.total} registros)`, req.ip
+    );
+    return res.json(report);
+  } catch (err: any) {
+    console.error('[MES LABORATORIOS ERROR]', err);
+    const knownError = err?.number === 51020 || err?.number === 51021;
+    return res.status(knownError ? (err.number === 51020 ? 409 : 503) : 500).json({
+      error: knownError ? err.message : 'No se pudo generar Reportes Mes Laboratorios. No se guardaron resultados parciales. Revise el procedimiento y los datos del período e intente nuevamente.'
+    });
+  }
+});
+
 app.get('/api/reportes/control-diario', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   if (Object.keys(req.query).length > 0) {
     return res.status(400).json({ error: 'Control Diario no admite parámetros; utiliza la fecha actual de SQL Server.' });
@@ -1346,11 +1419,17 @@ app.get('/api/ubigeo/clientes', authMiddleware, async (req: Request, res: Respon
   try {
     const pool = await getDbPool();
     const search = (req.query.search as string) || '';
-    let query = `SELECT Codclie, Razon, Documento FROM Clientes`;
+    let query = `
+      SELECT c.Codclie, c.Razon, c.Documento,
+        NULLIF(LTRIM(RTRIM(u.UBIGEO)), '') AS ubigeo,
+        s.nom_dpto AS departamento, s.nom_prov AS provincia, s.nom_dist AS distrito
+      FROM Clientes c
+      LEFT JOIN t_Clientes_ubigeo u ON u.CODIGO = c.Codclie
+      LEFT JOIN Ubigeos_SUNAT s ON s.ubigeo_6d = NULLIF(LTRIM(RTRIM(u.UBIGEO)), '')`;
     if (search) {
-      query = `SELECT Codclie, Razon, Documento FROM Clientes WHERE Razon LIKE @search OR Documento LIKE @search`;
+      query += ` WHERE (c.Razon LIKE @search OR c.Documento LIKE @search)`;
     }
-    query += ` ORDER BY Razon`;
+    query += ` ORDER BY c.Razon, c.Codclie`;
     const request = pool.request();
     if (search) {
       request.input('search', sql.NVarChar, `%${search}%`);

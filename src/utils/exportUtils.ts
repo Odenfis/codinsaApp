@@ -29,12 +29,12 @@ export function exportToExcel(data: any[], filename: string, sheetName: string =
   XLSX.writeFile(workbook, `${filename}_${new Date().toISOString().substring(0,10)}.xlsx`);
 }
 
-export function exportToPdf(title: string, headers: string[], rows: any[][], filename: string) {
+export function exportToPdf(title: string, headers: string[], rows: any[][], filename: string, options: { orientation?: 'portrait' | 'landscape'; fontSize?: number } = {}) {
   if (!rows || rows.length === 0) {
     alert('No hay datos disponibles para exportar a PDF.');
     return;
   }
-  const doc = new jsPDF();
+  const doc = new jsPDF({ orientation: options.orientation ?? 'portrait' });
 
   // Membrete Oficial
   doc.setFontSize(18);
@@ -55,7 +55,7 @@ export function exportToPdf(title: string, headers: string[], rows: any[][], fil
     body: rows,
     headStyles: { fillColor: [0, 103, 103], textColor: 255, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [241, 243, 245] },
-    styles: { fontSize: 9, cellPadding: 3, textColor: [25, 28, 29] }
+    styles: { fontSize: options.fontSize ?? 9, cellPadding: 3, textColor: [25, 28, 29] }
   });
 
   doc.save(`${filename}_${new Date().toISOString().substring(0,10)}.pdf`);

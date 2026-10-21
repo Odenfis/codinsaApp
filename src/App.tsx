@@ -25,6 +25,7 @@ import { PricesMarginsReportView } from './components/modules/PricesMarginsRepor
 import { SalesRegisterReportView } from './components/modules/SalesRegisterReportView';
 import { CustomersBySalespersonReportView } from './components/modules/CustomersBySalespersonReportView';
 import { MonthlyQuarterlySalesReportView } from './components/modules/MonthlyQuarterlySalesReportView';
+import { MonthlyLaboratoriesReportView } from './components/modules/MonthlyLaboratoriesReportView';
 import { DailySalesControlReportView } from './components/modules/DailySalesControlReportView';
 import { PsychotropicBalanceReportView } from './components/modules/PsychotropicBalanceReportView';
 import { PsychotropicPurchasesReportView } from './components/modules/PsychotropicPurchasesReportView';
@@ -82,6 +83,7 @@ const MainLayout: React.FC = () => {
       case '/reports/sales/sales-register': return <SalesRegisterReportView />;
       case '/reports/sales/customers-by-salesperson': return <CustomersBySalespersonReportView />;
       case '/reports/sales/monthly-quarterly-sales': return <MonthlyQuarterlySalesReportView />;
+      case '/reports/sales/monthly-laboratories': return <MonthlyLaboratoriesReportView />;
       case '/reports/sales/daily-control': return <DailySalesControlReportView />;
       case '/reports/purchases': return <PurchaseRegisterReportView />;
       case '/reports/purchases/purchase-register': return <PurchaseRegisterReportView />;

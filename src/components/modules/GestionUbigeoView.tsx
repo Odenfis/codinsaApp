@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ClienteSimple, UbigeoSunat, ProcesoMasivoEvento } from '../../types';
-import { Search, MapPin, Save, X, ChevronLeft, ChevronRight, Building2, Zap, CheckCircle2, XCircle, SkipForward, User } from 'lucide-react';
+import { Search, MapPin, Save, X, ChevronLeft, ChevronRight, ChevronDown, Building2, Zap, CheckCircle2, XCircle, SkipForward, User } from 'lucide-react';
 
 export const GestionUbigeoView: React.FC = () => {
   const [clientes, setClientes] = useState<ClienteSimple[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [estadoUbigeo, setEstadoUbigeo] = useState<'todos' | 'sin' | 'con'>('todos');
+  const [clientesError, setClientesError] = useState('');
+  const searchTermRef = useRef(searchTerm);
+  searchTermRef.current = searchTerm;
+  const clientesRequestRef = useRef(0);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
@@ -21,6 +26,7 @@ export const GestionUbigeoView: React.FC = () => {
   const [ubigeoCode, setUbigeoCode] = useState('');
 
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [loadingUbigeo, setLoadingUbigeo] = useState(false);
 
   const [showProgressModal, setShowProgressModal] = useState(false);
@@ -32,20 +38,29 @@ export const GestionUbigeoView: React.FC = () => {
   const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
   const loadClientes = useCallback(async () => {
+    const requestId = ++clientesRequestRef.current;
+    const search = searchTermRef.current;
+    setClientesError('');
     try {
-      const res = await fetch(`/api/ubigeo/clientes?search=${encodeURIComponent(searchTerm)}`, { headers });
-      if (res.ok) {
-        const data = await res.json();
+      const res = await fetch(`/api/ubigeo/clientes?search=${encodeURIComponent(search)}`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      if (!res.ok) throw new Error('No se pudo cargar el listado de clientes.');
+      const data = await res.json();
+      if (requestId === clientesRequestRef.current && search === searchTermRef.current) {
         setClientes(data.data || []);
       }
     } catch (err) {
-      console.error('Error cargando clientes:', err);
+      if (requestId === clientesRequestRef.current && search === searchTermRef.current) {
+        setClientesError('No se pudo actualizar el listado de clientes. Intenta nuevamente.');
+      }
     }
-  }, [searchTerm]);
+  }, [token]);
 
   useEffect(() => {
     loadClientes();
     setCurrentPage(1);
+    return () => { clientesRequestRef.current++; };
   }, [searchTerm, loadClientes]);
 
   useEffect(() => {
@@ -57,6 +72,7 @@ export const GestionUbigeoView: React.FC = () => {
   }, [isModalOpen]);
 
   const handleSelectCliente = async (cliente: ClienteSimple) => {
+    setSaveError('');
     setSelectedClient(cliente);
     setSelectedDpto('');
     setSelectedProv('');
@@ -154,8 +170,9 @@ export const GestionUbigeoView: React.FC = () => {
   const handleSave = async () => {
     if (!selectedClient || !ubigeoCode) return;
     setSaving(true);
+    setSaveError('');
     try {
-      await fetch(`/api/ubigeo/cliente/${selectedClient.Codclie}`, {
+      const res = await fetch(`/api/ubigeo/cliente/${selectedClient.Codclie}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -166,9 +183,14 @@ export const GestionUbigeoView: React.FC = () => {
           ubigeo: ubigeoCode
         })
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || 'No se pudo guardar el ubigeo. Intenta nuevamente.');
+      }
       setIsModalOpen(false);
+      await loadClientes();
     } catch (err) {
-      console.error('Error guardando ubigeo:', err);
+      setSaveError(err instanceof Error ? err.message : 'No se pudo guardar el ubigeo. Intenta nuevamente.');
     } finally {
       setSaving(false);
     }
@@ -247,8 +269,17 @@ export const GestionUbigeoView: React.FC = () => {
     ? Math.round(((progressData.processed + progressData.failed + progressData.skipped) / progressData.total) * 100)
     : 0;
 
-  const totalPages = Math.ceil(clientes.length / itemsPerPage) || 1;
-  const paginatedClientes = clientes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const filteredClientes = clientes.filter(cliente => {
+    const tieneUbigeo = Boolean(cliente.ubigeo?.trim());
+    return estadoUbigeo === 'todos' || (estadoUbigeo === 'con' ? tieneUbigeo : !tieneUbigeo);
+  });
+  const totalPages = Math.ceil(filteredClientes.length / itemsPerPage) || 1;
+  const visiblePage = Math.min(currentPage, totalPages);
+  const paginatedClientes = filteredClientes.slice((visiblePage - 1) * itemsPerPage, visiblePage * itemsPerPage);
+
+  useEffect(() => {
+    setCurrentPage(page => Math.min(page, totalPages));
+  }, [totalPages]);
 
   const getNombreDpto = () => departamentos.find(d => d.cod_dpto === selectedDpto)?.nom_dpto || '';
   const getNombreProv = () => provincias.find(p => p.cod_prov === selectedProv)?.nom_prov || '';
@@ -277,7 +308,25 @@ export const GestionUbigeoView: React.FC = () => {
             className="w-full bg-surface border border-outline-variant rounded-lg pl-10 pr-4 py-2 text-sm text-on-surface focus:border-primary focus:outline-none"
           />
         </div>
-        <div className="flex items-center gap-3">
+        <label className="flex items-center gap-2 text-xs text-on-surface-variant">
+          Estado de ubigeo
+          <span className="relative group inline-flex shrink-0">
+            <select
+              value={estadoUbigeo}
+              onChange={e => {
+                setEstadoUbigeo(e.target.value as 'todos' | 'sin' | 'con');
+                setCurrentPage(1);
+              }}
+              className="appearance-none cursor-pointer min-w-[140px] rounded-xl border border-outline-variant/70 bg-surface-container-lowest py-2.5 pl-4 pr-10 text-sm font-medium text-on-surface shadow-sm transition-colors hover:border-primary/50 hover:bg-primary/5 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15"
+            >
+              <option value="todos">Todos</option>
+              <option value="sin">Sin ubigeo</option>
+              <option value="con">Con ubigeo</option>
+            </select>
+            <ChevronDown aria-hidden="true" size={16} strokeWidth={1.75} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-outline transition-colors group-hover:text-primary group-focus-within:text-primary" />
+          </span>
+        </label>
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={startMassAssignment}
             disabled={processComplete && !showProgressModal}
@@ -295,10 +344,12 @@ export const GestionUbigeoView: React.FC = () => {
             Asignar Ubigeos DNI
           </button>
           <div className="text-xs font-bold text-outline">
-            Total: <span className="text-primary">{clientes.length}</span> clientes
+            Total: <span className="text-primary">{filteredClientes.length}</span> clientes
           </div>
         </div>
       </div>
+
+      {clientesError && <p role="alert" className="text-xs text-error">{clientesError}</p>}
 
       <div className="bg-surface-container-lowest border border-surface-variant rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
@@ -308,6 +359,7 @@ export const GestionUbigeoView: React.FC = () => {
                 <th className="py-3 px-4">Código</th>
                 <th className="py-3 px-4">Razón Social</th>
                 <th className="py-3 px-4">Documento</th>
+                <th className="py-3 px-4">Ubigeo actual</th>
                 <th className="py-3 px-4 text-center">Ubigeo</th>
               </tr>
             </thead>
@@ -318,6 +370,14 @@ export const GestionUbigeoView: React.FC = () => {
                   <td className="py-3 px-4 font-mono text-xs font-bold text-primary">{cliente.Codclie}</td>
                   <td className="py-3 px-4 font-semibold text-on-surface">{cliente.Razon}</td>
                   <td className="py-3 px-4 text-xs text-outline font-mono">{cliente.Documento}</td>
+                  <td className="py-3 px-4 text-xs text-on-surface-variant">
+                    <div className="min-w-[180px] max-w-xs whitespace-normal break-words">
+                      {!cliente.ubigeo?.trim() ? 'Sin ubigeo' :
+                        cliente.departamento && cliente.provincia && cliente.distrito
+                          ? `${cliente.departamento} / ${cliente.provincia} / ${cliente.distrito}`
+                          : 'Ubigeo no identificado'}
+                    </div>
+                  </td>
                   <td className="py-3 px-4 text-center">
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-primary-container text-on-primary-container">
                       <MapPin size={12} /> Asignar
@@ -326,19 +386,19 @@ export const GestionUbigeoView: React.FC = () => {
                 </tr>
               ))}
               {paginatedClientes.length === 0 && (
-                <tr><td colSpan={4} className="py-8 text-center text-outline text-xs">No se encontraron clientes.</td></tr>
+                <tr><td colSpan={5} className="py-8 text-center text-outline text-xs">No se encontraron clientes.</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
         <div className="p-4 border-t border-surface-variant bg-surface flex justify-between items-center text-xs text-outline">
-          <span>Página {currentPage} de {totalPages}</span>
+          <span>Página {visiblePage} de {totalPages}</span>
           <div className="flex gap-2">
-            <button disabled={currentPage === 1} onClick={() => setCurrentPage(c => c - 1)} className="p-1.5 rounded border border-outline-variant disabled:opacity-30 hover:bg-surface-container">
+            <button disabled={visiblePage === 1} onClick={() => setCurrentPage(visiblePage - 1)} className="p-1.5 rounded border border-outline-variant disabled:opacity-30 hover:bg-surface-container">
               <ChevronLeft size={16} />
             </button>
-            <button disabled={currentPage >= totalPages} onClick={() => setCurrentPage(c => c + 1)} className="p-1.5 rounded border border-outline-variant disabled:opacity-30 hover:bg-surface-container">
+            <button disabled={visiblePage >= totalPages} onClick={() => setCurrentPage(visiblePage + 1)} className="p-1.5 rounded border border-outline-variant disabled:opacity-30 hover:bg-surface-container">
               <ChevronRight size={16} />
             </button>
           </div>
@@ -559,6 +619,8 @@ export const GestionUbigeoView: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {saveError && <p role="alert" className="text-xs text-error">{saveError}</p>}
 
                 <div className="flex justify-end gap-2 mt-2 pt-4 border-t border-surface-variant">
                   <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-outline-variant rounded text-xs font-bold hover:bg-surface">
