@@ -35,6 +35,7 @@ import { buildPsychotropicPurchasesReport, parsePsychotropicPurchasesParameters,
 import { buildPsychotropicSalesReport, parsePsychotropicSalesParameters, psychotropicSalesQuery } from './src/backend/services/psychotropicSalesReport';
 import { buildPurchaseRegisterReport, parsePurchaseRegisterParameters } from './src/backend/services/purchaseRegisterReport';
 import { buildCustomerHistoryReport, parseCustomerHistoryCustomerId } from './src/backend/services/customerHistoryReport';
+import { promotionsRouter, promotionRole } from './src/backend/services/promotions';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -141,7 +142,7 @@ app.get('/api/modules', authMiddleware, (req: AuthenticatedRequest, res: Respons
   const idRol = req.user?.id_rol || 1;
   const allowedModuleIds = db.rolesModulos[idRol] || [];
   const menu = db.modulos
-    .filter(m => allowedModuleIds.includes(m.id_modulo) && m.estado)
+    .filter(m => allowedModuleIds.includes(m.id_modulo) && m.estado && (m.id_modulo !== 38 || [1, 3].includes(promotionRole(req.user?.usuario || '') ?? 0)))
     .sort((a, b) => a.orden - b.orden);
   return res.json({ modules: menu });
 });
@@ -226,6 +227,8 @@ app.delete('/api/providers/:id', authMiddleware, (req: AuthenticatedRequest, res
 // ==============================================================================
 // 3c. ENDPOINTS DE PRODUCTOS (Listado con filtros desde SQL Server real)
 // ==============================================================================
+
+app.use('/api/bonificaciones/promociones', promotionsRouter);
 
 app.get('/api/productos', authMiddleware, async (req: Request, res: Response) => {
   try {

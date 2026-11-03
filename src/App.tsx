@@ -34,6 +34,7 @@ import { PurchaseRegisterReportView } from './components/modules/PurchaseRegiste
 import { SettingsView } from './components/modules/SettingsView';
 import { AuditView } from './components/modules/AuditView';
 import { GestionUbigeoView } from './components/modules/GestionUbigeoView';
+import { PromotionsView } from './components/modules/PromotionsView';
 import { ProductsView } from './components/modules/ProductsView';
 import { ProductsEditCodLabView } from './components/modules/ProductsEditCodLabView';
 import { NisiraExportView } from './components/modules/NisiraExportView';
@@ -98,6 +99,8 @@ const MainLayout: React.FC = () => {
       case '/settings/erp-update': return <ErpUpdateView />;
       case '/audit': return <AuditView />;
       case '/clients/ubigeo': return <GestionUbigeoView />;
+      case '/bonificaciones':
+      case '/bonificaciones/promociones': return <PromotionsView />;
       case '/products': return <ProductsView />;
       case '/products/edit-lab': return <ProductsEditCodLabView />;
       default: return <DashboardView onNavigateToModule={setActiveRoute} />;

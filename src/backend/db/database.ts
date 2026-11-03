@@ -22,6 +22,9 @@ class EnterpriseDatabase {
       { id_modulo: 10, nombre_modulo: 'Listado de Productos', icono: 'List', ruta: '/products', orden: 1, estado: true },
       { id_modulo: 11, nombre_modulo: 'Editar Cod. Laboratorio', icono: 'PenLine', ruta: '/products/edit-lab', orden: 2, estado: true }
     ] },
+    { id_modulo: 38, nombre_modulo: 'Bonificaciones', icono: 'Package', ruta: '/bonificaciones', orden: 3.5, estado: true, children: [
+      { id_modulo: 39, nombre_modulo: 'Listado de Promociones', icono: 'List', ruta: '/bonificaciones/promociones', orden: 1, estado: true }
+    ] },
     { id_modulo: 5, nombre_modulo: 'Reportes', icono: 'BarChart3', ruta: '/reports', orden: 4, estado: true, children: [
       { id_modulo: 16, nombre_modulo: 'Cuentas', icono: 'WalletCards', ruta: '/reports/accounts', orden: 1, estado: true, children: [
         { id_modulo: 17, nombre_modulo: 'Reporte de Cobranzas', icono: 'ReceiptText', ruta: '/reports/accounts/collections', orden: 1, estado: true },
@@ -63,9 +66,9 @@ class EnterpriseDatabase {
   ];
 
   public rolesModulos: Record<number, number[]> = {
-    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37],
+    1: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39],
     2: [1, 2, 3, 5, 7, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37],
-    3: [1, 2, 3, 5, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37]
+    3: [1, 2, 3, 5, 9, 10, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
   };
 
   public usuarios: Usuario[] = [
