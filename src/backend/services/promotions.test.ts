@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePromotion, promotionRole } from './promotions';
+import { parsePromotion, promotionRole, promotionSqlDate } from './promotions';
 
 const valid = { laboratorio:'01', descripcion:'Promoción', inicio:'2026-01-01', fin:'2026-12-31', monto:10.25, producto:'01001', cantidad:1, productos:['01001','01002'] };
 test('valida promoción y conserva ceros en códigos', () => {
@@ -14,4 +14,12 @@ test('rechaza fechas, descripción y cantidades inválidas', () => {
 });
 test('exige productos sin duplicados y un producto principal', () => {
   for (const change of [{ productos: [] }, { productos: ['01001','01001'] }, { producto: '' }, { laboratorio:'' }]) assert.throws(() => parsePromotion({ ...valid, ...change }));
+});
+test('prepara fechas civiles sin desplazamiento de zona horaria', () => {
+  for (const fecha of ['1900-01-01', '2024-02-29', '2026-11-24', '2079-06-06']) {
+    assert.equal(promotionSqlDate(fecha).toISOString(), `${fecha}T00:00:00.000Z`);
+  }
+  for (const inicio of ['1899-12-31', '1900-02-29', '2079-06-07']) {
+    assert.throws(() => parsePromotion({ ...valid, inicio, fin: '2079-06-06' }));
+  }
 });

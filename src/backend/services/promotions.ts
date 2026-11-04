@@ -46,6 +46,15 @@ const failure = (res: Response, err: any) => {
 };
 const idParam = (s: string) => /^\d+$/.test(s) && Number(s) > 0 && Number(s) <= 2147483647 ? Number(s) : null;
 
+// parsePromotion ya comprobó que se trata de una fecha ISO real y dentro de rango.
+export function promotionSqlDate(value: string): Date {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+export function promotionSaveQuery(productCount: number): string {
+  return `DECLARE @codigo int=@id; IF @codigo IS NULL BEGIN SELECT @codigo=ISNULL(MAX(CodPromo),0)+1 FROM dbo.BoniPromo_cab WITH (UPDLOCK,HOLDLOCK); INSERT dbo.BoniPromo_cab(CodPromo,Laboratorio,Descripcion,Inicio,Fin,Monto,Producto,Cantidad) VALUES(@codigo,@lab,@descripcion,@inicio,@fin,@monto,@producto,@cantidad); END ELSE BEGIN UPDATE dbo.BoniPromo_cab SET Descripcion=@descripcion,Inicio=@inicio,Fin=@fin,Monto=@monto,Producto=@producto,Cantidad=@cantidad WHERE CodPromo=@codigo; DELETE dbo.BoniPromo_det WHERE Codpromo=@codigo; END; ${Array.from({ length: productCount }, (_, index) => `INSERT dbo.BoniPromo_det(Codpromo,CodPro) VALUES(@codigo,@detail${index});`).join(' ')} SELECT @codigo AS codigo;`;
+}
+
 promotionsRouter.get('/productos', async (req, res) => {
   const lab = typeof req.query.lab === 'string' ? req.query.lab.trim() : '';
   const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 100) : '';
@@ -90,9 +99,9 @@ async function save(req: AuthenticatedRequest, res: Response) {
     codes.forEach((code, index) => check.input(`code${index}`, sql.Char(10), code));
     const valid = await check.query(`SELECT COUNT(DISTINCT RTRIM(p.CodPro)) AS total FROM dbo.Productos p WHERE p.Eliminado=0 AND LEFT(p.CodPro,2)=LEFT(@lab,2) AND p.CodPro IN (${codes.map((_, index) => `@code${index}`).join(',')})`);
     if (valid.recordset[0].total !== codes.length) throw new Error('VALID:Hay productos inexistentes, eliminados o de otro laboratorio.');
-    const q = request().input('id', sql.Int, id).input('lab', sql.Char(4), data.laboratorio).input('descripcion', sql.VarChar(100), data.descripcion).input('inicio', sql.VarChar(10), data.inicio).input('fin', sql.VarChar(10), data.fin).input('monto', sql.Money, data.monto).input('producto', sql.Char(10), data.producto).input('cantidad', sql.Int, data.cantidad);
+    const q = request().input('id', sql.Int, id).input('lab', sql.Char(4), data.laboratorio).input('descripcion', sql.VarChar(100), data.descripcion).input('inicio', sql.Date, promotionSqlDate(data.inicio)).input('fin', sql.Date, promotionSqlDate(data.fin)).input('monto', sql.Money, data.monto).input('producto', sql.Char(10), data.producto).input('cantidad', sql.Int, data.cantidad);
     data.productos.forEach((code, index) => q.input(`detail${index}`, sql.Char(10), code));
-    const result = await q.query(`DECLARE @codigo int=@id; IF @codigo IS NULL BEGIN SELECT @codigo=ISNULL(MAX(CodPromo),0)+1 FROM dbo.BoniPromo_cab WITH (UPDLOCK,HOLDLOCK); INSERT dbo.BoniPromo_cab(CodPromo,Laboratorio,Descripcion,Inicio,Fin,Monto,Producto,Cantidad) VALUES(@codigo,@lab,@descripcion,CONVERT(smalldatetime,@inicio,23),CONVERT(smalldatetime,@fin,23),@monto,@producto,@cantidad); END ELSE BEGIN UPDATE dbo.BoniPromo_cab SET Descripcion=@descripcion,Inicio=CONVERT(smalldatetime,@inicio,23),Fin=CONVERT(smalldatetime,@fin,23),Monto=@monto,Producto=@producto,Cantidad=@cantidad WHERE CodPromo=@codigo; DELETE dbo.BoniPromo_det WHERE Codpromo=@codigo; END; ${data.productos.map((_, index) => `INSERT dbo.BoniPromo_det(Codpromo,CodPro) VALUES(@codigo,@detail${index});`).join(' ')} SELECT @codigo AS codigo;`);
+    const result = await q.query(promotionSaveQuery(data.productos.length));
     await tx.commit(); tx = undefined;
     const codigo = result.recordset[0].codigo;
     db.addAuditLog(req.user!.usuario, 'Bonificaciones', `${id ? 'Actualizó' : 'Creó'} promoción ${codigo}`, req.ip);
