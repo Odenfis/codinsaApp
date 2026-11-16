@@ -915,3 +915,5 @@ Esta actualización reemplaza el contrato `Mes INT` y el estado de instalación 
 
 - Se reprodujo en SQL Server el error 295 al convertir cadenas ISO `YYYY-MM-DD` directamente a `smalldatetime` con estilo 23. El guardado ahora envía `Inicio` y `Fin` como parámetros `sql.Date` construidos a medianoche UTC, tanto al crear como al editar; la validación y el rango admitido se mantienen.
 - `scripts/verifyPromotionDates.ts` ejecuta la consulta de guardado real contra tablas temporales en una transacción revertida. Verificó por separado creación y edición, dos productos asociados y fechas normales, bisiestas y límites de `smalldatetime`, con `DATEFORMAT dmy` y `mdy` y zona horaria `America/Lima`. No modificó promociones reales.
+- **Validación técnica:** cuatro pruebas del módulo aprobadas; `npm run lint`, `npm run build` y `git diff --check` correctos. El build conserva la advertencia previa sobre el tamaño del bundle. El usuario confirmó que el resultado de la corrección fue satisfactorio.
+- **Pendientes anteriores:** confirmar los perfiles contra una fuente real de roles y el mecanismo de correlativos del ERP; probar concurrencia con el ERP antes de producción.
