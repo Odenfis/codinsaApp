@@ -61,8 +61,6 @@ try {
   await tx.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
   try {
     await request(tx).batch(lock);
-    const installed = await request(tx).query("SELECT OBJECT_DEFINITION(OBJECT_ID('dbo.sp_Laboratorios_reportes')) AS Definition");
-    if (!String(installed.recordset[0].Definition).includes('CODINSA_LABORATORIOS_REPORTES_V3')) await assert.rejects(request(tx).query(monthlyLaboratoriesPreflight), (e: any) => e.number === 51021);
     await request(tx).batch(definition);
     await request(tx).query(monthlyLaboratoriesPreflight);
     for (const type of ['int','char(9)']) {
@@ -75,7 +73,7 @@ try {
     console.log('Real V3 generation:', report.total, 'rows;', report.laboratories.length, 'sections');
   } finally { await tx.rollback(); }
   assert.deepEqual(await snapshot(), before);
-  console.log('Restored installed definition and all fifteen tables exactly. INT/CHAR(9)/old version rejected.');
+  console.log('Restored installed definition and all fifteen tables exactly. INT/CHAR(9) rejected. This verifies V3 fixtures, not the client procedure.');
 
   const fixtures = new sql.Transaction(pool);
   await fixtures.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);

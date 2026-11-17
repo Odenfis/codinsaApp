@@ -50,13 +50,25 @@ test('período vacío conserva las quince secciones, rechaza resultados incomple
   sets[0][0].Mes = 'OCTUBRE'; delete sets[0][0].Producto; assert.throws(() => buildMonthlyLaboratoriesReport(sets, 10, 2026));
 });
 
-test('preflight exige versión compatible y esquema antes del único EXEC; lectura explícita sin DDL', () => {
-  assert.match(monthlyLaboratoriesPreflight, /CODINSA_LABORATORIOS_REPORTES_V3/);
+test('preflight comprueba procedimiento y orden físico antes del único EXEC; lectura explícita sin DDL', () => {
+  assert.match(monthlyLaboratoriesPreflight, /OBJECT_ID\(N'dbo.sp_Laboratorios_reportes', N'P'\)/);
+  assert.doesNotMatch(monthlyLaboratoriesPreflight, /CODINSA_LABORATORIOS_REPORTES_V3/);
+  assert.match(monthlyLaboratoriesPreflight, /posicion = 15 AND name = N'fecha'/);
+  assert.match(monthlyLaboratoriesPreflight, /posicion = 18 AND name = N'Ubigeo'/);
   assert.match(monthlyLaboratoriesPreflight, /CODINSA_LABORATORIOS_REPORTES/);
   assert.match(monthlyLaboratoriesPreflight, /@LockOwner = 'Transaction', @LockTimeout = 30000/);
   assert.equal((monthlyLaboratoriesQuery.match(/EXEC dbo.sp_Laboratorios_reportes/g) || []).length, 1);
   assert.equal((monthlyLaboratoriesQuery.match(/FROM dbo\.\[tc_/g) || []).length, 15);
   assert.doesNotMatch(monthlyLaboratoriesQuery, /SELECT \*|CREATE |ALTER |DELETE /i);
+});
+
+test('normaliza el mes escrito por el procedimiento del cliente solo para noviembre', () => {
+  const sets = fixture(11);
+  for (const rows of sets) rows[0].Mes = 'NOCIEMBRE     ';
+  const report = buildMonthlyLaboratoriesReport(sets, 11, 2026);
+  assert(report.laboratories.every(lab => lab.data[0].Mes === 'NOVIEMBRE'));
+  assert.equal(sets[0][0].Mes, 'NOCIEMBRE     ');
+  assert.throws(() => buildMonthlyLaboratoriesReport(sets, 10, 2026), /mes de las tablas/);
 });
 
 test('SP corregido conserva expresiones y filtros del original; solo cambia las asignaciones declaradas', () => {

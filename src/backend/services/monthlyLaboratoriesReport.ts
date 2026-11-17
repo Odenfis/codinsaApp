@@ -1,7 +1,6 @@
 import type { MonthlyLaboratoriesCell, MonthlyLaboratoriesResponse } from '../../types';
 import { monthlyLaboratoriesMonths, monthlyLaboratoriesRegistry, summarizeMonthlyLaboratory } from '../../utils/monthlyLaboratoriesModel';
 
-export const monthlyLaboratoriesVersion = 'CODINSA_LABORATORIOS_REPORTES_V3';
 export function parseMonthlyLaboratoriesParameters(body: unknown): { mes: number; anio: number } {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Seleccione mes y año.');
   const { mes, anio } = body as { mes?: unknown; anio?: unknown };
@@ -19,14 +18,18 @@ EXEC @lockResult = sys.sp_getapplock
   @LockOwner = 'Transaction', @LockTimeout = 30000;
 IF @lockResult < 0
   THROW 51020, 'Otro usuario está generando Reportes Mes Laboratorios. Intente nuevamente.', 1;
-IF OBJECT_DEFINITION(OBJECT_ID(N'dbo.sp_Laboratorios_reportes')) IS NULL
-  OR CHARINDEX('${monthlyLaboratoriesVersion}', OBJECT_DEFINITION(OBJECT_ID(N'dbo.sp_Laboratorios_reportes'))) = 0
-  THROW 51021, 'Debe instalar manualmente sql/sp_Laboratorios_reportes.sql (versión compatible V3). La API no modifica procedimientos. Verifique también el permiso VIEW DEFINITION.', 1;
+IF OBJECT_ID(N'dbo.sp_Laboratorios_reportes', N'P') IS NULL
+  THROW 51021, 'No se encuentra el procedimiento dbo.sp_Laboratorios_reportes o no es visible para el usuario SQL.', 1;
 ${monthlyLaboratoriesRegistry.map(lab => `
 IF OBJECT_ID(N'dbo.${lab.table}', N'U') IS NULL
   THROW 51021, 'Falta la tabla dbo.${lab.table}. Revise el esquema del reporte.', 1;
-${lab.columns.map(column => `IF COL_LENGTH(N'dbo.${lab.table}', N'${column.key}') IS NULL
-  THROW 51021, 'Falta ${lab.table}.${column.key}. Revise el esquema del reporte.', 1;`).join('\n')}
+${(() => {
+  const physical = lab.id === 'iqfarma' ? [...lab.columns.filter(column => column.key !== 'Ubigeo'), lab.columns.find(column => column.key === 'Ubigeo')!] : lab.columns;
+  return `IF (SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.${lab.table}')) <> ${physical.length}
+  THROW 51021, 'El número de columnas de ${lab.table} no coincide con el procedimiento del cliente.', 1;
+${physical.map((column, index) => `IF NOT EXISTS (SELECT 1 FROM (SELECT name, ROW_NUMBER() OVER (ORDER BY column_id) AS posicion FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.${lab.table}')) AS columnas WHERE posicion = ${index + 1} AND name = N'${column.key}')
+  THROW 51021, 'El orden de columnas de ${lab.table} no coincide con el procedimiento del cliente.', 1;`).join('\n')}`;
+})()}
 IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.${lab.table}') AND name = N'Mes' AND TYPE_NAME(user_type_id) = N'char' AND max_length >= 10)
   THROW 51021, '${lab.table}.Mes debe ser CHAR de al menos 10 caracteres para esta versión del reporte.', 1;
 `).join('\n')}
@@ -58,6 +61,9 @@ export function buildMonthlyLaboratoriesReport(recordsets: Record<string, unknow
           row[column.key] = value instanceof Date ? value.toISOString().substring(0, 10) : String(value).substring(0, 10);
         } else row[column.key] = String(value).trim();
       }
+      // The installed client procedure spells November this way; normalize only
+      // the response and leave the procedure and its tables untouched.
+      if (mes === 11 && row.Mes === 'NOCIEMBRE') row.Mes = 'NOVIEMBRE';
       if (row.Mes !== monthlyLaboratoriesMonths[mes - 1]?.toUpperCase()) throw new Error('El mes de las tablas no coincide con el período solicitado.');
       return row;
     }).sort((a, b) => {

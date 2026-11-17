@@ -917,3 +917,15 @@ Esta actualización reemplaza el contrato `Mes INT` y el estado de instalación 
 - `scripts/verifyPromotionDates.ts` ejecuta la consulta de guardado real contra tablas temporales en una transacción revertida. Verificó por separado creación y edición, dos productos asociados y fechas normales, bisiestas y límites de `smalldatetime`, con `DATEFORMAT dmy` y `mdy` y zona horaria `America/Lima`. No modificó promociones reales.
 - **Validación técnica:** cuatro pruebas del módulo aprobadas; `npm run lint`, `npm run build` y `git diff --check` correctos. El build conserva la advertencia previa sobre el tamaño del bundle. El usuario confirmó que el resultado de la corrección fue satisfactorio.
 - **Pendientes anteriores:** confirmar los perfiles contra una fuente real de roles y el mecanismo de correlativos del ERP; probar concurrencia con el ERP antes de producción.
+
+### Diagnóstico del reporte de laboratorios — 17/11/2026
+
+- Se comparó el SP V3 entregado con `sp_modificado.sql`: este último no tiene la marca V3 ni `NOCOUNT`, conserva `NOCIEMBRE`, elimina listas explícitas y limita `Codlabo` a diez caracteres en IQFarma. No se conoce el error original que motivó el cambio.
+- Se preparó `sql/diagnostico_laboratorios_reportes.sql` de solo lectura y se documentó cómo comparar instancia, definición, permisos, esquema y longitudes con las credenciales de administrador y aplicación. Pendiente ejecutarlo en el cliente y revisar sus resultados; no se modificaron SP, permisos ni datos.
+- Validación local: 90 pruebas automatizadas, TypeScript, build y `git diff --check` correctos; el build conserva la advertencia de tamaño. No se ejecutó el diagnóstico en SQL Server ni la prueba SQL transaccional: requieren conexión y base de pruebas identificada, respectivamente. Siguen pendientes el despliegue manual y la comparación contra el ERP del cliente.
+
+### Adaptación al SP instalado del cliente — 17/11/2026
+
+- El usuario confirmó que se conservará la definición instalada. Se eliminó la exigencia de la marca V3; el backend comprueba existencia del SP, cantidad y orden físico de las columnas de las quince tablas (IQFarma termina en fecha, NroDoc, Codven, Ubigeo), y Mes CHAR suficiente. Normaliza `NOCIEMBRE` a `NOVIEMBRE` solo en la respuesta de noviembre; conserva transacción y bloqueo. No se alteró ningún SP ni tabla.
+- El procedimiento del cliente corta `Codlabo` de IQFarma a diez caracteres; el diagnóstico mostró 553 productos, máximo ocho caracteres. Queda pendiente revisar metadatos completos y validar con el ERP; la aplicación no recupera códigos truncados por el SP. Los llamadores externos deben coordinar el mismo bloqueo.
+- Las pruebas unitarias, TypeScript y build se comprobaron localmente; no se ha ejecutado el procedimiento del cliente desde la aplicación ni verificado el esquema completo. La prueba SQL anterior sigue usando V3 y no acredita el comportamiento del procedimiento del cliente.
